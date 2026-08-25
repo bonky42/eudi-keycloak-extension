@@ -56,6 +56,10 @@ is issued by one of them. A list holding only your own anchor fixes issuance by 
 
 Signing in with an official PID needs none of this.
 
+The tooling that builds such a list, and the wallet patches that go with it, are not published here.
+They exist and they work; they are simply not something anyone has asked for yet. If you want to
+stand up an issuer of your own, open an issue and they will follow.
+
 ## Status — read this before deploying anything
 
 
