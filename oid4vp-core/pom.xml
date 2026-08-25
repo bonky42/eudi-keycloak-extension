@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.keycloak.oid4vp</groupId>
+    <artifactId>keycloak-oid4vp-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>oid4vp-core</artifactId>
+
+  <dependencies>
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-core</artifactId></dependency>
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-common</artifactId></dependency>
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-server-spi</artifactId></dependency>
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-server-spi-private</artifactId></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId></dependency>
+    <!-- test uniquement : génération de certificats via CertificateUtils -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <version>1.78</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- provided : le moteur journalise les présentations écartées ; Keycloak fournit jboss-logging
+         au runtime. Déclaré explicitement ici (et pas hérité) car keycloak-common déclare cette
+         même dépendance en scope "provided" dans son propre pom, et provided->provided n'est pas
+         transitif. -->
+    <dependency>
+      <groupId>org.jboss.logging</groupId>
+      <artifactId>jboss-logging</artifactId>
+      <version>3.6.1.Final</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- test uniquement : implémentation de CryptoProvider requise au runtime par
+         CryptoIntegration/CertificateUtils (chargée via CryptoIntegration.init(...)). -->
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-crypto-default</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

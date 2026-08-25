@@ -1,0 +1,13 @@
+Keycloak OID4VP
+Copyright 2026 Bernard Chesnoy
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this software except in compliance with the License. You may obtain a copy of
+the License in the LICENSE file distributed with this work, or at:
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+This software is an extension for Keycloak (https://www.keycloak.org/), which is
+itself distributed under the Apache License 2.0. Keycloak is not included in
+this repository; it is a dependency, and a build artefact of this project layers
+these extensions onto an upstream Keycloak image.

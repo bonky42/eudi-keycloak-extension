@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Builds the demo PKI and renders demo/realm.template.json into an importable realm.
+#
+# Two INDEPENDENT key pairs are produced, and that is the point:
+#   - the VERIFIER's signing key and certificate — we sign the OID4VP Request Object with it, and
+#     its SAN DNS must equal the host, because Oid4vpIdentityProvider derives the client_id as
+#     "x509_san_dns:" + baseUri.getHost();
+#   - a demo ISSUER CA — it becomes trustAnchorsPem, and it is what will sign the cards a local
+#     wallet presents.
+# Collapsing them into a single certificate would work, and would teach that a verifier is its own
+# trust anchor — the opposite of what this system does.
+#
+# Only openssl is required: no JVM, no Maven, no network, no container engine.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOST="localhost"
+OUT_DIR="$REPO_ROOT/demo/out"
+FORCE=0
+
+usage() {
+  cat >&2 <<'EOF'
+usage: scripts/prepare-demo [--host <hostname>] [--out-dir <path>] [--force]
+
+  --host      hostname the demo Keycloak is reached on; becomes the verifier
+              certificate's SAN DNS entry (default: localhost)
+  --out-dir   where to write keys and realm.json (default: demo/out)
+  --force     regenerate even if key material already exists
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host)    HOST="${2:?--host needs a value}"; shift 2 ;;
+    --out-dir) OUT_DIR="${2:?--out-dir needs a value}"; shift 2 ;;
+    --force)   FORCE=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo ">> unknown argument: $1" >&2; usage; exit 2 ;;
+  esac
+done
+
+command -v openssl >/dev/null 2>&1 || { echo ">> openssl is required but not on PATH" >&2; exit 1; }
+
+TEMPLATE="$REPO_ROOT/demo/realm.template.json"
+[ -f "$TEMPLATE" ] || { echo ">> template missing: $TEMPLATE" >&2; exit 1; }
+
+mkdir -p "$OUT_DIR"
+
+# Refuse to silently replace key material: regenerating under an already-imported realm leaves the
+# running configuration and the files on disk disagreeing, and nothing reports it.
+if [ "$FORCE" -eq 0 ] && [ -f "$OUT_DIR/verifier-key.pem" ]; then
+  echo ">> key material already exists in $OUT_DIR" >&2
+  echo ">> re-run with --force to regenerate (this invalidates any realm already imported from it)" >&2
+  exit 1
+fi
+
+echo ">> generating demo issuer CA"
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$OUT_DIR/issuer-ca-key.pem" 2>/dev/null
+openssl req -x509 -new -key "$OUT_DIR/issuer-ca-key.pem" -sha256 -days 3650 \
+  -subj "/CN=OID4VP demo issuer CA" \
+  -addext "basicConstraints=critical,CA:TRUE" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign" \
+  -out "$OUT_DIR/issuer-ca-cert.pem" 2>/dev/null
+
+echo ">> generating verifier key and certificate (SAN DNS:$HOST)"
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$OUT_DIR/verifier-key.pem" 2>/dev/null
+openssl req -x509 -new -key "$OUT_DIR/verifier-key.pem" -sha256 -days 825 \
+  -subj "/CN=$HOST" \
+  -addext "subjectAltName=DNS:$HOST" \
+  -addext "keyUsage=critical,digitalSignature" \
+  -out "$OUT_DIR/verifier-cert.pem" 2>/dev/null
+
+# PEM is base64 plus "-----BEGIN ...-----" delimiters: it holds no double quote and no backslash,
+# so folding newlines into \n is the only escaping a JSON string value needs.
+json_fold() { awk '{ printf "%s\\n", $0 }' "$1"; }
+
+# Literal (non-regex, non-backreference) replacement. Three separate mechanisms would each undo
+# the folding above if used here, which is why none of them is:
+#   - sed's replacement text expands \n into a real newline;
+#   - awk's gsub() reinterprets \ and & in its replacement;
+#   - awk's own -v assignment processes escape sequences BEFORE the program starts, so
+#     `-v value="$folded"` alone is already enough to turn \n back into a newline.
+# Passing through the environment is the one path that hands awk the bytes untouched.
+substitute() {
+  MARKER="$1" VALUE="$2" awk '
+    BEGIN { marker = ENVIRON["MARKER"]; value = ENVIRON["VALUE"] }
+    {
+      line = $0; out = ""
+      while ((p = index(line, marker)) > 0) {
+        out = out substr(line, 1, p - 1) value
+        line = substr(line, p + length(marker))
+      }
+      print out line
+    }'
+}
+
+echo ">> rendering realm"
+< "$TEMPLATE" \
+  substitute "@@TRUST_ANCHORS_PEM@@" "$(json_fold "$OUT_DIR/issuer-ca-cert.pem")" \
+| substitute "@@SIGNING_KEY_PEM@@"   "$(json_fold "$OUT_DIR/verifier-key.pem")" \
+| substitute "@@SIGNING_CERT_PEM@@"  "$(json_fold "$OUT_DIR/verifier-cert.pem")" \
+> "$OUT_DIR/realm.json"
+
+chmod 0644 "$OUT_DIR/realm.json"
+
+echo ">> written to $OUT_DIR"
+echo ">>   realm.json           realm 'oid4vp-demo' (recognition-only)"
+echo ">>   verifier-*.pem       verifier signing material, SAN DNS:$HOST"
+echo ">>   issuer-ca-*.pem      demo issuer CA — trust anchor, and the key that will sign the"
+echo ">>                        cards a local wallet presents"
+echo ">> next:  start Keycloak with these — see docs/GETTING-STARTED.md, step 3"

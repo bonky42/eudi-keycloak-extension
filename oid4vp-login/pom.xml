@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.keycloak.oid4vp</groupId>
+    <artifactId>keycloak-oid4vp-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>oid4vp-login</artifactId>
+
+  <properties>
+    <testcontainers.version>1.20.4</testcontainers.version>
+  </properties>
+
+  <dependencies>
+    <dependency><groupId>org.keycloak.oid4vp</groupId><artifactId>oid4vp-core</artifactId><version>0.1.0-SNAPSHOT</version></dependency>
+    <!-- réutilise le testsupport (SimulatedWallet, TestTrustChain, TestCredentialIssuer) de oid4vp-core -->
+    <dependency><groupId>org.keycloak.oid4vp</groupId><artifactId>oid4vp-core</artifactId><version>0.1.0-SNAPSHOT</version><type>test-jar</type><scope>test</scope></dependency>
+
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-core</artifactId></dependency>
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-common</artifactId></dependency>
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-server-spi</artifactId></dependency>
+    <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-server-spi-private</artifactId></dependency>
+    <dependency>
+      <groupId>org.keycloak</groupId><artifactId>keycloak-services</artifactId>
+      <version>${keycloak.version}</version><scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.ws.rs</groupId><artifactId>jakarta.ws.rs-api</artifactId>
+      <version>3.1.0</version><scope>provided</scope>
+    </dependency>
+
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId></dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId><artifactId>testcontainers</artifactId>
+      <version>${testcontainers.version}</version><scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId><artifactId>junit-jupiter</artifactId>
+      <version>${testcontainers.version}</version><scope>test</scope>
+    </dependency>
+    <!-- test uniquement : requis pour utiliser TestTrustChain (oid4vp-core test-jar),
+         qui génère des certificats via CertificateUtils/CryptoIntegration. Ces
+         dépendances sont test-scope dans oid4vp-core et ne se propagent donc pas
+         transitivement (cf. commentaire équivalent dans oid4vp-core/pom.xml). -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <version>1.78</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- provided (pas test) : Oid4vpIdentityProvider journalise via org.jboss.logging.Logger,
+         l'API de logging utilisée par Keycloak lui-même. keycloak-common déclare cette même
+         dépendance en scope "provided" dans son propre pom (provided->provided n'est pas
+         transitif, d'où la déclaration explicite ici) : le runtime Keycloak/Quarkus la fournit
+         déjà sur le classpath du serveur, donc pas de JAR à embarquer dans notre provider. -->
+    <dependency>
+      <groupId>org.jboss.logging</groupId>
+      <artifactId>jboss-logging</artifactId>
+      <version>3.6.1.Final</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-crypto-default</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- provided : la distribution Keycloak embarque ZXing pour les QR de l'enrôlement TOTP
+         (com.google.zxing.core-3.4.0.jar et com.google.zxing.javase-3.4.0.jar dans
+         /opt/keycloak/lib/lib/main/). On réutilise le sien plutôt que d'en embarquer un second —
+         la version DOIT donc rester alignée sur celle de l'image. -->
+    <dependency>
+      <groupId>com.google.zxing</groupId><artifactId>core</artifactId>
+      <version>3.4.0</version><scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.zxing</groupId><artifactId>javase</artifactId>
+      <version>3.4.0</version><scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Tests unitaires (phase test) : on EXCLUT le package it/ qui contient les
+           tests Testcontainers. Ils exigent le socket podman (indisponible sous
+           scripts/podman-mvn) et sont exécutés par failsafe en phase integration-test
+           via scripts/podman-mvn-it. Ainsi `mvn test` reste vert sans conteneur. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/it/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
+      <!-- Tests d'intégration Testcontainers : failsafe s'exécute APRÈS package, si bien
+           que les JARs du réacteur (oid4vp-core, oid4vp-login) existent dans leurs target/
+           et peuvent être montés dans /opt/keycloak/providers/ du conteneur Keycloak.
+           Nommer le test *IT (ex. WalletLoginE2eIT) et invoquer `verify`. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.2.5</version>
+        <configuration>
+          <includes>
+            <include>**/it/*IT.java</include>
+          </includes>
+          <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

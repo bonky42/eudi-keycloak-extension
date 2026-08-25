@@ -1,0 +1,14 @@
+target/
+*.iml
+.idea/
+.m2/
+
+# Demo PKI: prepare-demo writes real private keys here.
+demo/out/
+
+# Rebuilt account console: node modules, front-end bundle and Maven output are all reproducible
+# from source, see docs/GETTING-STARTED.md.
+account-console/oid4vp-account/node_modules/
+account-console/oid4vp-account/dist/
+account-console/oid4vp-account/target/
+account-console/oid4vp-account/generated/

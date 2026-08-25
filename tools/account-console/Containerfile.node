@@ -1,0 +1,31 @@
+# Node/pnpm tooling image for rebuilding the Keycloak account console.
+#
+# Built ONCE and reused, like the Android image: the wrapper refuses to build it, because an
+# implicit rebuild on every run is exactly what the project's tooling rule forbids. The pnpm store
+# lives in a named volume rather than in the image, so dependencies are not re-downloaded either.
+#
+# Everything is pinned. A floating toolchain would make a future rebuild produce a different bundle
+# for reasons nobody recorded — and this bundle ends up in front of users, so "why does this differ?"
+# must always have an answer.
+#
+# Fully qualified name: podman refuses short-name resolution without a TTY, so a bare `FROM node:22`
+# fails in a non-interactive build.
+FROM docker.io/library/node:22.11.0-bookworm-slim
+
+# pnpm is installed through npm, NOT through corepack.
+#
+# corepack 0.29 (bundled with node 22.11) ships outdated npm registry signing keys and dies with
+# "Cannot find matching keyid" on any `corepack prepare` — observed on 2026-08-17. Working around it
+# with COREPACK_INTEGRITY_KEYS=0 would mean disabling signature verification to install our build
+# tooling, which is a poor trade. A pinned `npm install -g` gets the same pinned pnpm without
+# turning a check off.
+ARG PNPM_VERSION=9.12.3
+RUN npm install -g "pnpm@${PNPM_VERSION}" && pnpm --version
+
+# Maven is needed because the scaffolded theme is a Maven project: `mvn package` wraps the built
+# assets into the JAR that Keycloak loads from /providers.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends maven ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src

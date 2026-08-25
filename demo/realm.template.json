@@ -1,0 +1,58 @@
+{
+  "realm": "oid4vp-demo",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subType": "user-profile",
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"lastName\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"unmanagedAttributePolicy\":\"ENABLED\"}"
+          ]
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "demo-app",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost/demo/callback"],
+      "webOrigins": ["+"]
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "oid4vp",
+      "providerId": "oid4vp",
+      "enabled": true,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "trustAnchorsPem": "@@TRUST_ANCHORS_PEM@@",
+        "signingKeyPem": "@@SIGNING_KEY_PEM@@",
+        "signingCertPem": "@@SIGNING_CERT_PEM@@",
+        "dcqlQueryJson": "{\"credentials\":[{\"id\":\"pid\",\"format\":\"dc+sd-jwt\",\"meta\":{\"vct_values\":[\"urn:eudi:pid:1\"]},\"claims\":[{\"path\":[\"sub\"]},{\"path\":[\"email\"]},{\"path\":[\"given_name\"]},{\"path\":[\"family_name\"]},{\"path\":[\"age_over_18\"]}]}],\"credential_sets\":[{\"required\":true,\"options\":[[\"pid\"]]}]}",
+        "matchingClaim": "email",
+        "subjectClaim": "sub",
+        "subjectClaimByVct": "urn:eudi:pid:1=sub",
+        "subjectPolicy": "REJECT",
+        "ttlSeconds": "120"
+      }
+    }
+  ]
+}
