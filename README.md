@@ -3,9 +3,11 @@
 A Keycloak extension that signs users in with an **EU Digital Identity Wallet**, and issues its own
 verifiable credentials to that wallet.
 
-Both directions work against the official EUDI reference wallet on a real phone: the login flow
-completes with an encrypted response under the OpenID4VC High Assurance Interoperability Profile,
-and the same instance issues an SD-JWT VC card over OID4VCI.
+Both directions have been made to work on a real phone, against the official EUDI reference wallet —
+but not to the same degree. **Signing in is ready**: the flow completes with an encrypted response
+under the OpenID4VC High Assurance Interoperability Profile, using the wallet unmodified. **Issuing
+is work in progress**: the same instance issues an SD-JWT VC card over OID4VCI and accepts it back,
+demonstrated end to end, but only against a wallet rebuilt for the purpose.
 
 *Independent project. Not affiliated with, nor endorsed by, Red Hat or the European Commission.*
 
@@ -19,19 +21,25 @@ that come with it.
 The alternative, a standalone verifier service, would have been quicker to demonstrate and would
 have left every integration still to do.
 
-## What works, and what needs a patched wallet
+## What is ready, and what is still work in progress
 
 
 | | |
 |---|---|
-| **Sign in with a PID** | Works with the **unmodified** official EUDI wallet. |
-| **Receive a card issued here** | Needs a rebuilt wallet, for two independent reasons — see below. |
+| **Sign in with a PID** — [OpenID4VP 1.0](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) | **Ready and usable.** Works with the **unmodified** official EUDI wallet, on a real phone. |
+| **Issue a card** — [OpenID4VCI 1.0](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) | **Works, but work in progress.** Demonstrated end to end, and reproducible only against a rebuilt wallet — for two independent reasons. |
 
-So the login path is reproducible by anyone. Issuance is not, and it takes more than one fix.
+**Verification is the part to look at.** A stock wallet, an official PID, and a login that
+completes: that path is finished and needs nothing from this repository beyond what is here.
+Issuance works too — the instance really does issue its own SD-JWT VC and accept it back — but
+calling it usable would be overselling it, because nobody can reproduce it with a wallet from a
+store. Here is what stands in the way.
 
-**A wallet builds the wrong credential request.** OID4VCI 1.0 §8.2 requires `credential_identifier`
-as soon as the Token Response carries `authorization_details` of type `openid_credential` — which
-Keycloak always sends — and forbids `credential_configuration_id` in that case. The reference
+**A wallet builds the wrong credential request.**
+[OpenID4VCI 1.0 §8.2](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-8.2)
+requires `credential_identifier` as soon as the Token Response carries `authorization_details` of
+type `openid_credential` — which Keycloak always sends — and forbids `credential_configuration_id`
+in that case. The reference
 wallet's library sends the configuration-based form unconditionally, so issuance fails with
 *"Authorization detail type of openid_credential require usage of credential identifiers in
 credential request"*. The fix is upstream PR
@@ -39,16 +47,14 @@ credential request"*. The fix is upstream PR
 opened on 2026-06-30 and still unmerged.
 
 **And a wallet would not trust this issuer anyway.** A wallet checks issuer trust *at issuance
-time*, against a signed List of Trusted Entities (ETSI TS 119 602). The official EUDI list carries
+time*, against a signed List of Trusted Entities — ETSI TS 119 602. The official EUDI list carries
 its seven anchors and is not open to self-service, so no third-party issuer appears in it. The list
 a wallet reads is wallet *configuration*, not a protocol constant, so a rebuilt wallet can be
 pointed at another one — but that list must **enrich, never replace**: it has to carry the official
 entries byte for byte alongside the new anchor, because the PID that bootstraps every identity here
 is issued by one of them. A list holding only your own anchor fixes issuance by breaking enrolment.
 
-Signing in with an official PID needs none of this. That asymmetry is the honest summary: **this
-project can be verified against a stock wallet, and demonstrated as an issuer only against a
-rebuilt one.**
+Signing in with an official PID needs none of this.
 
 ## Status — read this before deploying anything
 
@@ -71,7 +77,8 @@ uses the Utopia test PID. Nothing here has been through eIDAS conformance.
   configurable subject claim per credential type.
 - **Issuer pinning**: a credential of our own type is accepted only if its chain validates against
   pinned anchors — with no permissive fallback, deliberately.
-- **OID4VCI issuance** of an SD-JWT VC card, offered from the account console.
+- **OID4VCI issuance** of an SD-JWT VC card, offered from the account console — work in progress,
+  see above.
 - **A unified flow**: one request declares our card and the PID as two optional sets, so the holder
   presents what they hold and the verifier infers the situation without server-side state.
 
