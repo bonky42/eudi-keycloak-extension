@@ -25,9 +25,30 @@ have left every integration still to do.
 | | |
 |---|---|
 | **Sign in with a PID** | Works with the **unmodified** official EUDI wallet. |
-| **Receive a card issued here** | Needs upstream fix [`eudi-lib-android-wallet-core#369`](https://github.com/eu-digital-identity-wallet/eudi-lib-android-wallet-core/pull/369), still unmerged. Without it a wallet builds a configuration-based credential request where OID4VCI 1.0 §8.2 requires an identifier-based one as soon as the token response carries `authorization_details` — which Keycloak always sends. |
+| **Receive a card issued here** | Needs a rebuilt wallet, for two independent reasons — see below. |
 
-So the login path is reproducible by anyone; issuance currently is not, until that PR lands.
+So the login path is reproducible by anyone. Issuance is not, and it takes more than one fix.
+
+**A wallet builds the wrong credential request.** OID4VCI 1.0 §8.2 requires `credential_identifier`
+as soon as the Token Response carries `authorization_details` of type `openid_credential` — which
+Keycloak always sends — and forbids `credential_configuration_id` in that case. The reference
+wallet's library sends the configuration-based form unconditionally, so issuance fails with
+*"Authorization detail type of openid_credential require usage of credential identifiers in
+credential request"*. The fix is upstream PR
+[`eudi-lib-android-wallet-core#369`](https://github.com/eu-digital-identity-wallet/eudi-lib-android-wallet-core/pull/369),
+opened on 2026-06-30 and still unmerged.
+
+**And a wallet would not trust this issuer anyway.** A wallet checks issuer trust *at issuance
+time*, against a signed List of Trusted Entities (ETSI TS 119 602). The official EUDI list carries
+its seven anchors and is not open to self-service, so no third-party issuer appears in it. The list
+a wallet reads is wallet *configuration*, not a protocol constant, so a rebuilt wallet can be
+pointed at another one — but that list must **enrich, never replace**: it has to carry the official
+entries byte for byte alongside the new anchor, because the PID that bootstraps every identity here
+is issued by one of them. A list holding only your own anchor fixes issuance by breaking enrolment.
+
+Signing in with an official PID needs none of this. That asymmetry is the honest summary: **this
+project can be verified against a stock wallet, and demonstrated as an issuer only against a
+rebuilt one.**
 
 ## Status — read this before deploying anything
 
