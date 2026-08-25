@@ -118,6 +118,31 @@ Mount the result the same way as the other two:
 Issuance also needs upstream [`eudi-lib-android-wallet-core#369`](https://github.com/eu-digital-identity-wallet/eudi-lib-android-wallet-core/pull/369),
 which is not merged. Until it is, a stock wallet cannot complete the card request.
 
+## 6. Build a runtime image (optional)
+
+Steps 1 to 3 need no image: they mount the jars into the upstream Keycloak. An image is for
+deploying somewhere, and it assembles rather than compiles — build all three jars first, including
+the console from step 5.
+
+```bash
+docker build -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+
+docker run --rm -p 127.0.0.1:8080:8080 \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  -v "$PWD/demo/out/realm.json":/opt/keycloak/data/import/realm-oid4vp-demo.json:z \
+  eudi-keycloak-extension:26.7.0 start-dev --import-realm
+```
+
+**The database vendor is a build option, not a runtime one.** Under `start --optimized`, anything
+not baked into the image and supplied only at startup — an environment variable, a command-line
+argument — is silently ignored. The image defaults to `postgres`; change it and you must rebuild:
+
+```bash
+docker build --build-arg KC_DB=dev-file -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+```
+
+`start-dev`, as used above, overrides it anyway, so the demo is unaffected either way.
+
 ## When something fails
 
 Several failure messages in this ecosystem do not describe their cause — a wallet saying a document
