@@ -8,6 +8,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -99,6 +100,54 @@ class DemoRealmIT {
         assertEquals(200, page.statusCode(), "expected the QR page; body=" + snippet(page.body()));
         assertTrue(page.body().contains("<img id=\"oid4vp-qr-img\" src=\"data:image/png;base64,"),
             "the login page carries no server-rendered QR; body=" + snippet(page.body()));
+    }
+
+    /**
+     * The shipped realm must let a visitor reach the French page.
+     *
+     * <p>The repository ships a complete French bundle, and the demo realm did not enable
+     * internationalisation — so the switcher never rendered and the translation could not be
+     * chosen by anyone running the published demo. Asserting that the selector exists would not
+     * catch that on its own: what matters is that following it arrives somewhere French, which is
+     * the whole chain (the realm's locales, the endpoint, the cookie, the flow restart).</p>
+     *
+     * <p>Like the switcher itself, this performs in one step what the page's script does in the
+     * browser: keep the query Keycloak built, replace the path with the endpoint the page
+     * advertises.</p>
+     */
+    @Test
+    void theImportedRealmCanBeReadInFrench() throws Exception {
+        String authUrl = baseUrl + "/realms/" + REALM + "/protocol/openid-connect/auth"
+            + "?client_id=" + CLIENT_ID
+            + "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8)
+            + "&response_type=code&scope=openid&state=demo-locale"
+            + "&kc_idp_hint=oid4vp";
+
+        HttpBrowser browser = new HttpBrowser();
+        HttpResponse<String> page = browser.get(authUrl);
+        assertEquals(200, page.statusCode(), "expected the login page; body=" + snippet(page.body()));
+        String html = page.body();
+
+        String option = group(html, "(?:value|href)=\"([^\"]*kc_locale=fr[^\"]*)\"");
+        assertTrue(option != null,
+            "the demo realm must offer French: internationalizationEnabled and supportedLocales "
+                + "have to be in the imported realm, or the shipped bundle is unreachable; body="
+                + snippet(html));
+        String endpoint = group(html, "var endpoint = \"([^\"]+)\";");
+        assertTrue(endpoint != null, "the page must advertise the locale endpoint; body=" + snippet(html));
+
+        String query = URI.create(baseUrl).resolve(option.replace("&amp;", "&")).getRawQuery();
+        HttpResponse<String> french = browser.get(endpoint + "?" + query);
+
+        assertEquals(200, french.statusCode(), "the language switch must land on a page; body="
+            + snippet(french.body()));
+        assertTrue(french.body().contains("Ce site demande"),
+            "the demo must be readable in French; body=" + snippet(french.body()));
+    }
+
+    private static String group(String s, String regex) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(regex).matcher(s);
+        return m.find() ? m.group(1) : null;
     }
 
     private static String snippet(String body) {

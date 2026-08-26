@@ -5,6 +5,9 @@
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "fr"],
+  "defaultLocale": "en",
   "components": {
     "org.keycloak.userprofile.UserProfileProvider": [
       {
