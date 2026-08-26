@@ -349,6 +349,79 @@ class WalletLoginE2eIT {
     }
 
     /**
+     * Changing the page language must return OUR page, in the chosen language.
+     *
+     * <p><b>What broke, and why nothing caught it.</b> Keycloak builds the switcher's links from the
+     * current page's URL plus {@code kc_locale}. Ours is rendered by {@code performLogin} at
+     * {@code /broker/{alias}/login}, which demands a single-use {@code session_code} the switcher
+     * does not carry, so following the link answered 400. Every earlier test asserted on the markup
+     * and never followed a link, and a browser set to French got a French page through
+     * {@code Accept-Language} — so the defect only showed on a click.</p>
+     *
+     * <p><b>What this test does and does not cover.</b> The repointing itself happens in the browser:
+     * the template rewrites each option's URL because Keycloak's switcher markup is out of our
+     * reach. This client speaks HTTP and runs no script, so it performs that same rewrite by hand —
+     * take the endpoint the page advertises, keep the query string Keycloak built, replace the path —
+     * and then follows the result exactly as a browser would. That covers the server half end to end:
+     * the endpoint exists, writes the locale, restarts the flow, and lands back on our page in the
+     * new language. It does NOT execute the page's JavaScript, so the assertions below additionally
+     * pin the script's presence and its selectors; without them the two halves could drift apart
+     * silently, which is the failure mode this whole test exists to prevent.</p>
+     *
+     * <p>Asserting 200 alone would be worthless: restarting the flow reaches Keycloak's own login
+     * form with a 200 too, and that is precisely one of the wrong destinations measured while
+     * diagnosing this. The assertions therefore name our own element and our own French wording.</p>
+     */
+    @Test
+    void languageSwitchReturnsOurPageInTheChosenLanguage() throws Exception {
+        COOKIES.clear();
+        HttpClient browser = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
+
+        String authUrl = baseUrl + "/realms/" + REALM + "/protocol/openid-connect/auth"
+            + "?client_id=" + CLIENT_ID
+            + "&redirect_uri=" + enc(REDIRECT_URI)
+            + "&response_type=code&scope=openid&state=locale-state"
+            + "&kc_idp_hint=oid4vp";
+        HttpResponse<String> page = follow(browser, authUrl, null);
+        assertEquals(200, page.statusCode(), "expected the login page (200), body=" + snippet(page.body()));
+        String html = page.body();
+
+        // The starting point must be English, or "it came back in French" would prove nothing.
+        assertTrue(html.contains("This site is asking your wallet"),
+            "the page must start in English for the switch to be observable, body=" + snippet(html));
+
+        // The realm declares two locales, so Keycloak must have rendered a switcher at all. Without
+        // this the test would pass vacuously the day internationalisation stops being imported.
+        String optionUrl = firstMatch(html, "(?:value|href)=\"([^\"]*kc_locale=fr[^\"]*)\"");
+        assertNotNull(optionUrl, "Keycloak must render a language option for fr, body=" + snippet(html));
+
+        // The page must advertise where a language change has to go, and carry the script that
+        // performs the rewrite for a real browser.
+        String endpoint = firstMatch(html, "var endpoint = \"([^\"]+)\";");
+        assertNotNull(endpoint, "the page must advertise the locale endpoint, body=" + snippet(html));
+        assertTrue(html.contains("#login-select-toggle option[value]"),
+            "the script must repoint the keycloak.v2 select, body=" + snippet(html));
+        assertTrue(html.contains("#kc-locale a[href], #language-switch1 a[href]"),
+            "the script must repoint the base theme's anchors, body=" + snippet(html));
+
+        // Exactly what the script does: keep Keycloak's query string, replace the path.
+        URI raw = URI.create(baseUrl).resolve(unescapeHtml(optionUrl));
+        URI switchUrl = URI.create(URI.create(baseUrl).resolve(endpoint).toString() + "?" + raw.getRawQuery());
+
+        HttpResponse<String> switched = follow(browser, switchUrl.toString(), null);
+        assertEquals(200, switched.statusCode(),
+            "the language switch must land on a page, not an error, body=" + snippet(switched.body()));
+        String fr = switched.body();
+
+        assertTrue(fr.contains("oid4vp-qr-img"),
+            "the switch must return OUR page, not Keycloak's login form, body=" + snippet(fr));
+        assertTrue(fr.contains("Ce site demande"),
+            "our page must come back in French, body=" + snippet(fr));
+    }
+
+    /**
      * The same flow as the happy path, but the wallet answers with a tampered {@code nonce}: the
      * KB-JWT binds the presentation to a nonce other than the one the Request Object issued. The
      * presentation is otherwise perfectly valid, so only the verification engine — not a shallow
@@ -900,6 +973,18 @@ class WalletLoginE2eIT {
             fail("motif introuvable [" + regex + "] dans : " + snippet(source));
         }
         return m.group(1);
+    }
+
+    /** First capturing group of {@code regex} in {@code s}, or {@code null} when it does not match. */
+    private static String firstMatch(String s, String regex) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(regex).matcher(s);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /** The few entities FreeMarker's HTML escaping puts into an attribute value. */
+    private static String unescapeHtml(String s) {
+        return s.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
+            .replace("&lt;", "<").replace("&gt;", ">");
     }
 
     private static String enc(String v) {
