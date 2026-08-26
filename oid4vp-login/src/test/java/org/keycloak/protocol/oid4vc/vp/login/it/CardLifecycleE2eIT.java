@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Proves, against a real Keycloak 26.7.0, that the card this Keycloak issues itself really does
+ * Proves, against a real Keycloak 26.7.2, that the card this Keycloak issues itself really does
  * sign its holder back in — the whole journey, end to end: sign in with a PID, the account is
  * created, the entitlement granted, the card offer displayed, the wallet receives the card, and
  * signing in again with OUR card lands on the SAME Keycloak account.
@@ -157,7 +157,7 @@ class CardLifecycleE2eIT {
         assertTrue(Files.isRegularFile(loginJar), "provider JAR absent (lancer via `verify`, pas `test`): " + loginJar);
         assertTrue(Files.isRegularFile(coreJar), "provider JAR absent (lancer via `verify`, pas `test`): " + coreJar);
 
-        keycloak = new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:26.7.0"))
+        keycloak = new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:26.7.2"))
             .withExposedPorts(8080)
             .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
             .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")

@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Drives the COMPLETE OID4VP brokered login flow against a real Keycloak 26.7.0 carrying our
+ * Drives the COMPLETE OID4VP brokered login flow against a real Keycloak 26.7.2 carrying our
  * providers.
  *
  * <p>{@code maven-failsafe-plugin} runs this in the {@code integration-test} phase, so after
@@ -114,7 +114,7 @@ class WalletLoginE2eIT {
         assertTrue(Files.isRegularFile(loginJar), "provider JAR absent (lancer via `verify`, pas `test`): " + loginJar);
         assertTrue(Files.isRegularFile(coreJar), "provider JAR absent (lancer via `verify`, pas `test`): " + coreJar);
 
-        keycloak = new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:26.7.0"))
+        keycloak = new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:26.7.2"))
             .withExposedPorts(8080)
             .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
             .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")
@@ -218,6 +218,18 @@ class WalletLoginE2eIT {
         assertFalse(html.contains("date of birth"),
             "a claim this request does not ask for must not appear: the list is read from the DCQL "
                 + "being sent, not from a list somebody maintains, body=" + snippet(html));
+        // The requested data is the page's most consequential content, and as plain prose it read
+        // as an aside. It now sits in its own panel — and the panel has to CONTAIN its heading,
+        // not merely follow it, or the list is framed while its own label is left outside. Index
+        // order is what distinguishes the two, so it is what is asserted.
+        assertTrue(html.contains("<div id=\"oid4vp-requested\">"),
+            "the requested data must sit in its own panel, body=" + snippet(html));
+        assertTrue(html.indexOf("oid4vp-requested") < html.indexOf("oid4vp-shared-intro"),
+            "the panel must contain its heading, not follow it, body=" + snippet(html));
+        // The heading names the list; the visual grouping alone does not say so out loud.
+        assertTrue(html.contains("aria-labelledby=\"oid4vp-shared-intro\""),
+            "the list must be labelled by its heading for a screen reader, body=" + snippet(html));
+
         assertTrue(html.contains("data-ttl-seconds=\"120\""),
             "the countdown needs the TTL the transaction was created with, body=" + snippet(html));
 
@@ -346,6 +358,139 @@ class WalletLoginE2eIT {
         assertEquals(GIVEN_NAME, attrs.get("oid4vp.given_name").get(0).asText(),
             "the oid4vp.given_name attribute must be set on the created user");
         assertEquals(VCT, attrs.get("oid4vp.vct").get(0).asText());
+    }
+
+    /**
+     * Changing the page language must return OUR page, in the chosen language.
+     *
+     * <p><b>What broke, and why nothing caught it.</b> Keycloak builds the switcher's links from the
+     * current page's URL plus {@code kc_locale}. Ours is rendered by {@code performLogin} at
+     * {@code /broker/{alias}/login}, which demands a single-use {@code session_code} the switcher
+     * does not carry, so following the link answered 400. Every earlier test asserted on the markup
+     * and never followed a link, and a browser set to French got a French page through
+     * {@code Accept-Language} — so the defect only showed on a click.</p>
+     *
+     * <p><b>What this test does and does not cover.</b> The repointing itself happens in the browser:
+     * the template rewrites each option's URL because Keycloak's switcher markup is out of our
+     * reach. This client speaks HTTP and runs no script, so it performs that same rewrite by hand —
+     * take the endpoint the page advertises, keep the query string Keycloak built, replace the path —
+     * and then follows the result exactly as a browser would. That covers the server half end to end:
+     * the endpoint exists, writes the locale, restarts the flow, and lands back on our page in the
+     * new language. It does NOT execute the page's JavaScript, so the assertions below additionally
+     * pin the script's presence and its selectors; without them the two halves could drift apart
+     * silently, which is the failure mode this whole test exists to prevent.</p>
+     *
+     * <p>Asserting 200 alone would be worthless: restarting the flow reaches Keycloak's own login
+     * form with a 200 too, and that is precisely one of the wrong destinations measured while
+     * diagnosing this. The assertions therefore name our own element and our own French wording.</p>
+     */
+    @Test
+    void languageSwitchReturnsOurPageInTheChosenLanguage() throws Exception {
+        COOKIES.clear();
+        HttpClient browser = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
+
+        String authUrl = baseUrl + "/realms/" + REALM + "/protocol/openid-connect/auth"
+            + "?client_id=" + CLIENT_ID
+            + "&redirect_uri=" + enc(REDIRECT_URI)
+            + "&response_type=code&scope=openid&state=locale-state"
+            + "&kc_idp_hint=oid4vp";
+        HttpResponse<String> page = follow(browser, authUrl, null);
+        assertEquals(200, page.statusCode(), "expected the login page (200), body=" + snippet(page.body()));
+        String html = page.body();
+
+        // The starting point must be English, or "it came back in French" would prove nothing.
+        assertTrue(html.contains("This site is asking your wallet"),
+            "the page must start in English for the switch to be observable, body=" + snippet(html));
+
+        // The realm declares two locales, so Keycloak must have rendered a switcher at all. Without
+        // this the test would pass vacuously the day internationalisation stops being imported.
+        String optionUrl = firstMatch(html, "(?:value|href)=\"([^\"]*kc_locale=fr[^\"]*)\"");
+        assertNotNull(optionUrl, "Keycloak must render a language option for fr, body=" + snippet(html));
+
+        // The page must advertise where a language change has to go, and carry the script that
+        // performs the rewrite for a real browser.
+        String endpoint = firstMatch(html, "var endpoint = \"([^\"]+)\";");
+        assertNotNull(endpoint, "the page must advertise the locale endpoint, body=" + snippet(html));
+        assertTrue(html.contains("#login-select-toggle option[value]"),
+            "the script must repoint the keycloak.v2 select, body=" + snippet(html));
+        assertTrue(html.contains("#kc-locale a[href], #language-switch1 a[href]"),
+            "the script must repoint the base theme's anchors, body=" + snippet(html));
+
+        // Exactly what the script does: keep Keycloak's query string, replace the path.
+        URI raw = URI.create(baseUrl).resolve(unescapeHtml(optionUrl));
+        URI switchUrl = URI.create(URI.create(baseUrl).resolve(endpoint).toString() + "?" + raw.getRawQuery());
+
+        HttpResponse<String> switched = follow(browser, switchUrl.toString(), null);
+        assertEquals(200, switched.statusCode(),
+            "the language switch must land on a page, not an error, body=" + snippet(switched.body()));
+        String fr = switched.body();
+
+        assertTrue(fr.contains("oid4vp-qr-img"),
+            "the switch must return OUR page, not Keycloak's login form, body=" + snippet(fr));
+        assertTrue(fr.contains("Ce site demande"),
+            "our page must come back in French, body=" + snippet(fr));
+    }
+
+    /**
+     * The locale endpoint must degrade, never break.
+     *
+     * <p>Two shapes reach it that the happy path does not. <b>Missing routing parameters:</b>
+     * anyone can request the bare URL, and it must not answer 500 — which is exactly what it did
+     * in production on 2026-08-26, because JAX-RS requires
+     * {@code UriBuilder.replaceQueryParam} to reject a null value and the restart URL was built
+     * from the query parameters unchecked. <b>Missing {@code client_data} alone:</b> this one is
+     * not hypothetical and not malformed. {@code FreeMarkerLoginFormsProvider.prepareBaseUriBuilder}
+     * omits {@code client_data} while the authentication session is logging out, so a switcher
+     * link rendered in that state carries {@code client_id} and {@code tab_id} but no
+     * {@code client_data} — a browser reaches this shape on its own, and it must still switch the
+     * language.</p>
+     */
+    @Test
+    void localeEndpointDegradesInsteadOfBreaking() throws Exception {
+        COOKIES.clear();
+        HttpClient browser = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
+
+        String authUrl = baseUrl + "/realms/" + REALM + "/protocol/openid-connect/auth"
+            + "?client_id=" + CLIENT_ID
+            + "&redirect_uri=" + enc(REDIRECT_URI)
+            + "&response_type=code&scope=openid&state=degrade-state"
+            + "&kc_idp_hint=oid4vp";
+        HttpResponse<String> page = follow(browser, authUrl, null);
+        assertEquals(200, page.statusCode(), "expected the login page (200), body=" + snippet(page.body()));
+        String html = page.body();
+
+        String endpoint = firstMatch(html, "var endpoint = \"([^\"]+)\";");
+        assertNotNull(endpoint, "the page must advertise the locale endpoint, body=" + snippet(html));
+        String endpointUrl = URI.create(baseUrl).resolve(endpoint).toString();
+
+        String optionUrl = firstMatch(html, "(?:value|href)=\"([^\"]*kc_locale=fr[^\"]*)\"");
+        assertNotNull(optionUrl, "Keycloak must render a language option for fr, body=" + snippet(html));
+        String query = URI.create(baseUrl).resolve(unescapeHtml(optionUrl)).getRawQuery();
+        String clientIdParam = firstMatch(query, "(?:^|&)(client_id=[^&]*)");
+        String tabIdParam = firstMatch(query, "(?:^|&)(tab_id=[^&]*)");
+        assertNotNull(clientIdParam, "Keycloak's switcher URL must carry client_id, query=" + query);
+        assertNotNull(tabIdParam, "Keycloak's switcher URL must carry tab_id, query=" + query);
+
+        // 1) No routing parameters at all. A refusal is correct; a 500 is not, and neither is a
+        //    silent cookie write, which would record a language nothing is shown in.
+        HttpResponse<String> bare = follow(browser, endpointUrl + "?kc_locale=fr", null);
+        assertEquals(400, bare.statusCode(),
+            "the bare endpoint must refuse cleanly, not throw, body=" + snippet(bare.body()));
+
+        // 2) client_id and tab_id but no client_data — the shape Keycloak itself renders while a
+        //    session is logging out. This must still switch the language.
+        String noClientData = endpointUrl + "?kc_locale=fr&" + clientIdParam + "&" + tabIdParam;
+        HttpResponse<String> switched = follow(browser, noClientData, null);
+        assertEquals(200, switched.statusCode(),
+            "a switcher link without client_data must still work, body=" + snippet(switched.body()));
+        assertTrue(switched.body().contains("oid4vp-qr-img"),
+            "it must return OUR page, body=" + snippet(switched.body()));
+        assertTrue(switched.body().contains("Ce site demande"),
+            "it must come back in French, body=" + snippet(switched.body()));
     }
 
     /**
@@ -900,6 +1045,18 @@ class WalletLoginE2eIT {
             fail("motif introuvable [" + regex + "] dans : " + snippet(source));
         }
         return m.group(1);
+    }
+
+    /** First capturing group of {@code regex} in {@code s}, or {@code null} when it does not match. */
+    private static String firstMatch(String s, String regex) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(regex).matcher(s);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /** The few entities FreeMarker's HTML escaping puts into an attribute value. */
+    private static String unescapeHtml(String s) {
+        return s.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
+            .replace("&lt;", "<").replace("&gt;", ">");
     }
 
     private static String enc(String v) {

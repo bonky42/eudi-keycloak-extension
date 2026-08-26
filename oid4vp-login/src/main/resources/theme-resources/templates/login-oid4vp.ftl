@@ -16,14 +16,21 @@
 
             <#-- What is being asked for, read from the DCQL actually being sent. A claim with no
                  label falls back to its technical name rather than vanishing: the page must never
-                 ask for something it does not show. -->
+                 ask for something it does not show.
+
+                 The heading lives INSIDE the panel, not above it. It names the list, so leaving it
+                 outside would frame the items and orphan their own label — a decorated list rather
+                 than one block. `aria-labelledby` states that relationship for a screen reader,
+                 which the visual grouping alone does not carry. -->
             <#if requestedClaims?? && requestedClaims?size gt 0>
-                <p id="oid4vp-shared-intro">${msg("oid4vpSharedIntro")}</p>
-                <ul id="oid4vp-shared">
-                    <#list requestedClaims as claim>
-                        <li>${msg("oid4vpClaim." + claim, claim)}</li>
-                    </#list>
-                </ul>
+                <div id="oid4vp-requested">
+                    <p id="oid4vp-shared-intro">${msg("oid4vpSharedIntro")}</p>
+                    <ul id="oid4vp-shared" aria-labelledby="oid4vp-shared-intro">
+                        <#list requestedClaims as claim>
+                            <li>${msg("oid4vpClaim." + claim, claim)}</li>
+                        </#list>
+                    </ul>
+                </div>
             </#if>
 
             <p id="oid4vp-instructions">${msg("oid4vpScanInstructions")}</p>
@@ -70,7 +77,26 @@
                 @media (min-width: 600px) and (any-pointer: fine) {
                     #oid4vp-paths #oid4vp-qr { order: -1; }
                 }
-                #oid4vp-shared { margin: 0 0 1em; }
+                /* The list of data leaving the wallet is the most consequential thing on this
+                   page, and as plain prose it read as an aside. This gives it an edge — open on
+                   the right, so it reads as a boundary being crossed rather than as a card, and
+                   so it does not stack a box inside the card the theme already draws.
+
+                   Every colour derives from currentColor: this template is rendered inside a
+                   theme we do not own, in light and dark, and copying that theme's tokens would
+                   drift the day it changes. The flat greys on the line above are the fallback for
+                   an engine without color-mix; they are dull but legible on either ground. */
+                #oid4vp-requested {
+                    border-left: 3px solid rgba(128, 128, 128, 0.45);
+                    border-left-color: color-mix(in srgb, currentColor 38%, transparent);
+                    background: rgba(128, 128, 128, 0.06);
+                    background: color-mix(in srgb, currentColor 5%, transparent);
+                    border-radius: 0 4px 4px 0;
+                    padding: 0.8em 1em;
+                    margin: 0 0 1em;
+                }
+                #oid4vp-shared-intro { margin: 0 0 0.4em; font-weight: 500; }
+                #oid4vp-shared { margin: 0; }
                 #oid4vp-countdown { font-variant-numeric: tabular-nums; }
             </style>
 
@@ -176,6 +202,66 @@
                     setInterval(tick, 1000);
                     tick();
                     schedule();
+                })();
+            </script>
+
+            <#-- The language switcher, repointed.
+
+                 Keycloak renders it from locale.supported[].url, which is THIS page's URL with
+                 kc_locale added. That URL cannot be requested twice: /broker/{alias}/login wants a
+                 single-use session_code the switcher never carries, so following it answers 400.
+                 The query string, though, is already right — Keycloak puts client_id, tab_id and
+                 client_data on it, which is exactly what restarting the flow needs. So only the
+                 path is wrong, and only the path is replaced.
+
+                 Rewriting the URLs rather than intercepting the event is deliberate. The
+                 keycloak.v2 theme carries onchange="window.location.href=this.value" as an inline
+                 attribute, which a listener cannot cancel with stopPropagation; leaving that
+                 handler alone and changing where it points needs no interception at all, and the
+                 same loop covers the base theme, which renders anchors and no <select>.
+
+                 Nothing here assumes the switcher exists. With internationalisation off, or on a
+                 future theme that renames these elements, every query below matches nothing and
+                 the page is unchanged. -->
+            <script type="text/javascript">
+                (function () {
+                    var endpoint = "${localeEndpoint?no_esc}";
+                    if (!endpoint) { return; }
+
+                    function repoint(raw) {
+                        try {
+                            var here = window.location.href;
+                            var target = new URL(endpoint, here);
+                            // Carries kc_locale AND the client_id/tab_id/client_data that the
+                            // restart needs. Copied wholesale so a future Keycloak adding another
+                            // parameter keeps working without a change here.
+                            target.search = new URL(raw, here).search;
+                            return target.toString();
+                        } catch (e) {
+                            return null;   // an unparsable URL leaves the option as it was
+                        }
+                    }
+
+                    function apply() {
+                        var opts = document.querySelectorAll("#login-select-toggle option[value]");
+                        for (var i = 0; i < opts.length; i++) {
+                            var v = repoint(opts[i].value);
+                            if (v) { opts[i].value = v; }
+                        }
+                        var links = document.querySelectorAll("#kc-locale a[href], #language-switch1 a[href]");
+                        for (var j = 0; j < links.length; j++) {
+                            var h = repoint(links[j].getAttribute("href"));
+                            if (h) { links[j].setAttribute("href", h); }
+                        }
+                    }
+
+                    // The switcher is rendered by template.ftl, outside this section: run once the
+                    // document is parsed rather than trusting it to appear above us.
+                    if (document.readyState === "loading") {
+                        document.addEventListener("DOMContentLoaded", apply);
+                    } else {
+                        apply();
+                    }
                 })();
             </script>
         </div>
