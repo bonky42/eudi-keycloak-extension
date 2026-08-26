@@ -41,6 +41,7 @@ import org.keycloak.protocol.oid4vc.vp.login.identity.ResolvedIdentity;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.ClaimsToContext;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.EngineFactory;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
+import org.keycloak.protocol.oid4vc.vp.login.protocol.RequestedClaims;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.PresentationNote;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.QrContent;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.QrPng;
@@ -167,6 +168,12 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
             .setAttribute("qrDataUri", qrDataUri)
             .setAttribute("statusUrl", statusUrl)
             .setAttribute("completeUrl", completeUrl)
+            // What only the server knows, and what the page could not say without it. The status
+            // endpoint stays as it is: it exposes the status and nothing else, deliberately, and
+            // widening it would put the content of the request on an endpoint that answers anyone.
+            .setAttribute("requestPurpose", cfg.requestPurpose())
+            .setAttribute("requestedClaims", RequestedClaims.of(cfg.dcqlQuery()))
+            .setAttribute("ttlSeconds", cfg.ttlSeconds())
             .createForm("login-oid4vp.ftl");
     }
 
