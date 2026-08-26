@@ -614,7 +614,9 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
             // flow calls AuthenticationManager.backchannelLogout on the SSO session that shares the
             // root authentication session's id — so changing the page language would sign the
             // holder out of every other application in the realm. Verified against 26.7.0 bytecode
-            // (LoginActionsService.restartSession).
+            // (LoginActionsService.restartSession), and re-verified unchanged in 26.7.2 — same
+            // guard, same offsets. Re-check it on the next server upgrade: nothing fails loudly if
+            // this flips, the holder is simply signed out elsewhere.
             URI restart = Urls.realmLoginRestartPage(
                 session.getContext().getUri().getBaseUri(), realm.getName(),
                 clientId, tabId, clientData, true);
