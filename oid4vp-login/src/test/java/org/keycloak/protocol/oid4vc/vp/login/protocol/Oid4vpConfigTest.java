@@ -190,9 +190,35 @@ class Oid4vpConfigTest {
     void anUnparseablePinYieldsNoAnchorsRatherThanThrowing() throws Exception {
         TestTrustChain chain = new TestTrustChain();
         Map<String, String> config = buildConfig(chain);
-        config.put(Oid4vpConfig.OWN_ISSUER_ANCHORS_PEM, "ceci n'est pas du PEM");
+        config.put(Oid4vpConfig.OWN_ISSUER_ANCHORS_PEM, "this is not a PEM block");
 
         assertTrue(new Oid4vpConfig(config).ownIssuerAnchors().isEmpty(),
             "a malformed pin must fail closed, not blow up mid-login");
+    }
+
+    // ---- Request purpose ------------------------------------------------------
+
+    @Test
+    void requestPurposeDefaultsToAShippedMessageKey() {
+        assertEquals("${oid4vpDefaultPurpose}", new Oid4vpConfig(Map.of()).requestPurpose(),
+            "a stock install states a purpose rather than staying silent, which is what "
+                + "OpenID4VP 1.0 section 6.2 asks for");
+    }
+
+    @Test
+    void requestPurposeAcceptsAMessageKeyOrLiteralText() {
+        assertEquals("${myOwnKey}",
+            new Oid4vpConfig(Map.of(Oid4vpConfig.REQUEST_PURPOSE, "${myOwnKey}")).requestPurpose(),
+            "a key is passed through untouched, for advancedMsg to resolve against the bundle");
+        assertEquals("To prove you may enter the building",
+            new Oid4vpConfig(Map.of(Oid4vpConfig.REQUEST_PURPOSE,
+                "To prove you may enter the building")).requestPurpose(),
+            "literal text is used as written, in whatever language the deployer wrote it");
+    }
+
+    @Test
+    void anExplicitlyBlankPurposeMeansShowNothing() {
+        assertNull(new Oid4vpConfig(Map.of(Oid4vpConfig.REQUEST_PURPOSE, "   ")).requestPurpose(),
+            "clearing the field is a decision to say nothing, not a request for the default");
     }
 }

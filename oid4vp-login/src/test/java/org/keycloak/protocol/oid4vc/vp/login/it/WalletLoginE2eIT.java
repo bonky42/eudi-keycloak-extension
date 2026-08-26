@@ -201,7 +201,45 @@ class WalletLoginE2eIT {
             "the deep link must stay: on the same device the phone is both browser and wallet, "
                 + "so there is nothing to scan");
         assertFalse(html.contains("window.QRCode"),
-            "le garde-fou JavaScript mort doit avoir disparu");
+            "the dead JavaScript guard must be gone");
+
+        // What only the server knows, and what the page could not say before.
+        assertTrue(html.contains("This site is asking your wallet for the information below"),
+            "the default purpose must be RESOLVED from the bundle, not rendered as a literal "
+                + "${oid4vpDefaultPurpose}: that is the whole point of advancedMsg, and it has "
+                + "never been observed for a template served from a provider JAR, body="
+                + snippet(html));
+        // This test's DCQL asks for given_name and age_over_18, and for nothing else. Asserting
+        // both what is named and what is not is what proves the list is derived from the request
+        // rather than written somewhere: a hardcoded list would pass the first half alone.
+        assertTrue(html.contains("first name") && html.contains("whether you are over 18"),
+            "the page must name the claims this DCQL asks for, labelled from the bundle, body="
+                + snippet(html));
+        assertFalse(html.contains("date of birth"),
+            "a claim this request does not ask for must not appear: the list is read from the DCQL "
+                + "being sent, not from a list somebody maintains, body=" + snippet(html));
+        assertTrue(html.contains("data-ttl-seconds=\"120\""),
+            "the countdown needs the TTL the transaction was created with, body=" + snippet(html));
+
+        assertTrue(html.contains("id=\"oid4vp-link-hint\""),
+            "a deep link that leads nowhere fails silently on a desktop; the page must be able to "
+                + "say so, body=" + snippet(html));
+        assertFalse(html.contains("QR code to scan with your wallet"),
+            "the alt text must offer an action rather than announce an unusable image, body="
+                + snippet(html));
+        assertTrue(html.indexOf("oid4vp-wallet-link") < html.indexOf("oid4vp-qr-img"),
+            "the link must come before the code in the markup: nobody scans a code with the device "
+                + "showing it, and a screen reader should meet the actionable path first. The "
+                + "stylesheet, not the markup, decides what a wide screen shows first, body="
+                + snippet(html));
+
+        assertFalse(html.contains("\"Presentation was rejected.\"")
+                || html.contains("\"The login request expired.\""),
+            "no user-visible string may live in the script: it cannot be translated there, body="
+                + snippet(html));
+        assertTrue(html.contains("visibilitychange"),
+            "on the same-device path the browser is backgrounded while the holder is in the "
+                + "wallet; polling must resume the moment it returns, body=" + snippet(html));
 
         String statusUrl = extract(html, "var statusUrl = \"([^\"]+)\";");
         String completeUrl = extract(html, "var completeUrl = \"([^\"]+)\";");

@@ -30,6 +30,8 @@ public final class Oid4vpConfig {
     public static final String DCQL_QUERY_JSON = "dcqlQueryJson";
     public static final String MATCHING_CLAIM = "matchingClaim";
     public static final String TTL_SECONDS = "ttlSeconds";
+    /** Why this verifier is asking. See {@link #requestPurpose()}. */
+    public static final String REQUEST_PURPOSE = "requestPurpose";
     public static final String SUBJECT_CLAIM = "subjectClaim";
     public static final String SUBJECT_POLICY = "subjectPolicy";
     public static final String OWN_VCT = "ownVct";
@@ -41,6 +43,7 @@ public final class Oid4vpConfig {
     public static final String SUBJECT_CLAIM_BY_VCT = "subjectClaimByVct";
 
     private static final int DEFAULT_TTL_SECONDS = 120;
+    private static final String DEFAULT_REQUEST_PURPOSE = "${oid4vpDefaultPurpose}";
     private static final String DEFAULT_SUBJECT_CLAIM = "sub";
     private static final int DEFAULT_REISSUE_BEFORE_SECONDS = 2_592_000;   // 30 days
     /** The only valid value for {@link #SUBJECT_POLICY}; exposed so the admin-console config
@@ -124,6 +127,32 @@ public final class Oid4vpConfig {
             return DEFAULT_TTL_SECONDS;
         }
         return Integer.parseInt(raw.trim());
+    }
+
+    /**
+     * Why this verifier is asking for the credential, shown to the holder before they decide.
+     *
+     * <p>OpenID4VP 1.0 section 6.2 asks the Verifier to display the purpose, context or reason for
+     * a query, and defines no protocol field carrying it — a Credential Set Query has
+     * {@code options} and {@code required} and nothing else. The verifier's own page is therefore
+     * the only place this can appear.</p>
+     *
+     * <p>Rendered with Keycloak's {@code advancedMsg}, so the value is either a message key of the
+     * form <code>${someKey}</code>, resolved against the theme bundle and therefore translatable,
+     * or literal text used as written. That is the same idiom Keycloak uses for consent: its
+     * built-in client scopes store <code>${profileScopeConsentText}</code> verbatim, and
+     * {@code login-oauth-grant.ftl} resolves it the same way. An administrator already knows this
+     * convention, and can point it at a key in a theme of their own.</p>
+     *
+     * @return the configured value; the shipped default key when unset; {@code null} when the
+     *         administrator explicitly cleared it, which means show nothing
+     */
+    public String requestPurpose() {
+        String raw = config.get(REQUEST_PURPOSE);
+        if (raw == null) {
+            return DEFAULT_REQUEST_PURPOSE;
+        }
+        return raw.isBlank() ? null : raw.trim();
     }
 
     public String subjectClaim() {

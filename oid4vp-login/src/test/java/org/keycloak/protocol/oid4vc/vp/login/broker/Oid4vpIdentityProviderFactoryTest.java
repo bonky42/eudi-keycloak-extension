@@ -29,6 +29,7 @@ class Oid4vpIdentityProviderFactoryTest {
         Oid4vpConfig.DCQL_QUERY_JSON,
         Oid4vpConfig.MATCHING_CLAIM,
         Oid4vpConfig.TTL_SECONDS,
+        Oid4vpConfig.REQUEST_PURPOSE,
         Oid4vpConfig.SUBJECT_CLAIM,
         Oid4vpConfig.SUBJECT_POLICY,
         Oid4vpConfig.OWN_VCT,
