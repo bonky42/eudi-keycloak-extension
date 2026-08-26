@@ -21,6 +21,7 @@ import org.keycloak.broker.provider.BrokeredIdentityContext;
 import org.keycloak.broker.provider.UserAuthenticationIdentityProvider.AuthenticationCallback;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.forms.login.LoginFormsProvider;
+import org.keycloak.locale.LocaleUpdaterProvider;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
 import org.keycloak.models.IdentityProviderModel;
@@ -174,6 +175,10 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
             .setAttribute("requestPurpose", cfg.requestPurpose())
             .setAttribute("requestedClaims", RequestedClaims.of(cfg.dcqlQuery()))
             .setAttribute("ttlSeconds", cfg.ttlSeconds())
+            // Where the page must send a language change. Keycloak builds the switcher's own
+            // links from this page's URL, which cannot be requested a second time; the template
+            // repoints them here. Empty is not a case: this endpoint always exists.
+            .setAttribute("localeEndpoint", responseUriBase + "/locale")
             .createForm("login-oid4vp.ftl");
     }
 
@@ -564,6 +569,56 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
         @Produces(MediaType.APPLICATION_JSON)
         public String status(@PathParam("tx") String tx) {
             return endpoints.status(tx);
+        }
+
+        /**
+         * Language switch for the login page this provider renders.
+         *
+         * <p><b>Why this exists at all.</b> Keycloak's own switcher navigates to the current page's
+         * URL with {@code kc_locale} appended, and {@code LocaleUtil.processLocaleParam} turns that
+         * parameter into the {@code KEYCLOAK_LOCALE} cookie. That works for pages served by
+         * {@code /login-actions/authenticate}, which can be re-requested. Ours is rendered by
+         * {@code performLogin} at {@code /broker/{alias}/login}, which requires a single-use
+         * {@code session_code} the switcher does not carry — so the switcher's link answers 400.
+         * This endpoint is the missing destination: the template rewrites each option to point
+         * here, keeping the query string Keycloak already built.</p>
+         *
+         * <p><b>Why the cookie is written here and not in the browser.</b> {@code KEYCLOAK_LOCALE}
+         * is declared {@code HttpOnly} ({@code CookieType.LOCALE}), so a {@code document.cookie}
+         * write that would overwrite an existing one is rejected by the browser without an error.
+         * Delegating to {@link LocaleUpdaterProvider} is also what makes the cookie's path, scope
+         * and {@code SameSite}/{@code Secure} attributes correct by construction rather than
+         * replicated — a replica would drift the day Keycloak changes them.</p>
+         *
+         * <p><b>Unknown locales are ignored, never rejected.</b> A value outside the realm's
+         * supported set leaves the cookie untouched and still restarts the flow, so the holder
+         * lands on a working page in the language they already had. Answering an error instead
+         * would turn a cosmetic request into a dead end, and the value arrives from a query
+         * parameter anyone can edit.</p>
+         */
+        @GET
+        @Path("locale")
+        public Response locale(@QueryParam("kc_locale") String requestedLocale,
+                               @QueryParam("client_id") String clientId,
+                               @QueryParam("tab_id") String tabId,
+                               @QueryParam("client_data") String clientData) {
+            KeycloakSession session = provider.session;
+            RealmModel realm = session.getContext().getRealm();
+
+            if (realm.isInternationalizationEnabled() && requestedLocale != null
+                && realm.getSupportedLocalesStream().anyMatch(requestedLocale::equals)) {
+                session.getProvider(LocaleUpdaterProvider.class).updateLocaleCookie(requestedLocale);
+            }
+
+            // skip_logout=true is NOT a detail. Left false (the endpoint's default), restarting the
+            // flow calls AuthenticationManager.backchannelLogout on the SSO session that shares the
+            // root authentication session's id — so changing the page language would sign the
+            // holder out of every other application in the realm. Verified against 26.7.0 bytecode
+            // (LoginActionsService.restartSession).
+            URI restart = Urls.realmLoginRestartPage(
+                session.getContext().getUri().getBaseUri(), realm.getName(),
+                clientId, tabId, clientData, true);
+            return Response.status(Response.Status.FOUND).location(restart).build();
         }
 
         /**

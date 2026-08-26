@@ -6,6 +6,9 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "verifiableCredentialsEnabled": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "fr"],
+  "defaultLocale": "en",
   "components": {
     "org.keycloak.keys.KeyProvider": [
       {

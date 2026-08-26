@@ -178,6 +178,66 @@
                     schedule();
                 })();
             </script>
+
+            <#-- The language switcher, repointed.
+
+                 Keycloak renders it from locale.supported[].url, which is THIS page's URL with
+                 kc_locale added. That URL cannot be requested twice: /broker/{alias}/login wants a
+                 single-use session_code the switcher never carries, so following it answers 400.
+                 The query string, though, is already right — Keycloak puts client_id, tab_id and
+                 client_data on it, which is exactly what restarting the flow needs. So only the
+                 path is wrong, and only the path is replaced.
+
+                 Rewriting the URLs rather than intercepting the event is deliberate. The
+                 keycloak.v2 theme carries onchange="window.location.href=this.value" as an inline
+                 attribute, which a listener cannot cancel with stopPropagation; leaving that
+                 handler alone and changing where it points needs no interception at all, and the
+                 same loop covers the base theme, which renders anchors and no <select>.
+
+                 Nothing here assumes the switcher exists. With internationalisation off, or on a
+                 future theme that renames these elements, every query below matches nothing and
+                 the page is unchanged. -->
+            <script type="text/javascript">
+                (function () {
+                    var endpoint = "${localeEndpoint?no_esc}";
+                    if (!endpoint) { return; }
+
+                    function repoint(raw) {
+                        try {
+                            var here = window.location.href;
+                            var target = new URL(endpoint, here);
+                            // Carries kc_locale AND the client_id/tab_id/client_data that the
+                            // restart needs. Copied wholesale so a future Keycloak adding another
+                            // parameter keeps working without a change here.
+                            target.search = new URL(raw, here).search;
+                            return target.toString();
+                        } catch (e) {
+                            return null;   // an unparsable URL leaves the option as it was
+                        }
+                    }
+
+                    function apply() {
+                        var opts = document.querySelectorAll("#login-select-toggle option[value]");
+                        for (var i = 0; i < opts.length; i++) {
+                            var v = repoint(opts[i].value);
+                            if (v) { opts[i].value = v; }
+                        }
+                        var links = document.querySelectorAll("#kc-locale a[href], #language-switch1 a[href]");
+                        for (var j = 0; j < links.length; j++) {
+                            var h = repoint(links[j].getAttribute("href"));
+                            if (h) { links[j].setAttribute("href", h); }
+                        }
+                    }
+
+                    // The switcher is rendered by template.ftl, outside this section: run once the
+                    // document is parsed rather than trusting it to appear above us.
+                    if (document.readyState === "loading") {
+                        document.addEventListener("DOMContentLoaded", apply);
+                    } else {
+                        apply();
+                    }
+                })();
+            </script>
         </div>
     </#if>
 </@layout.registrationLayout>
