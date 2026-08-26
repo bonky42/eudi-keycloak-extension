@@ -422,6 +422,66 @@ class WalletLoginE2eIT {
     }
 
     /**
+     * The locale endpoint must degrade, never break.
+     *
+     * <p>Two shapes reach it that the happy path does not. <b>Missing routing parameters:</b>
+     * anyone can request the bare URL, and it must not answer 500 — which is exactly what it did
+     * in production on 2026-08-26, because JAX-RS requires
+     * {@code UriBuilder.replaceQueryParam} to reject a null value and the restart URL was built
+     * from the query parameters unchecked. <b>Missing {@code client_data} alone:</b> this one is
+     * not hypothetical and not malformed. {@code FreeMarkerLoginFormsProvider.prepareBaseUriBuilder}
+     * omits {@code client_data} while the authentication session is logging out, so a switcher
+     * link rendered in that state carries {@code client_id} and {@code tab_id} but no
+     * {@code client_data} — a browser reaches this shape on its own, and it must still switch the
+     * language.</p>
+     */
+    @Test
+    void localeEndpointDegradesInsteadOfBreaking() throws Exception {
+        COOKIES.clear();
+        HttpClient browser = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
+
+        String authUrl = baseUrl + "/realms/" + REALM + "/protocol/openid-connect/auth"
+            + "?client_id=" + CLIENT_ID
+            + "&redirect_uri=" + enc(REDIRECT_URI)
+            + "&response_type=code&scope=openid&state=degrade-state"
+            + "&kc_idp_hint=oid4vp";
+        HttpResponse<String> page = follow(browser, authUrl, null);
+        assertEquals(200, page.statusCode(), "expected the login page (200), body=" + snippet(page.body()));
+        String html = page.body();
+
+        String endpoint = firstMatch(html, "var endpoint = \"([^\"]+)\";");
+        assertNotNull(endpoint, "the page must advertise the locale endpoint, body=" + snippet(html));
+        String endpointUrl = URI.create(baseUrl).resolve(endpoint).toString();
+
+        String optionUrl = firstMatch(html, "(?:value|href)=\"([^\"]*kc_locale=fr[^\"]*)\"");
+        assertNotNull(optionUrl, "Keycloak must render a language option for fr, body=" + snippet(html));
+        String query = URI.create(baseUrl).resolve(unescapeHtml(optionUrl)).getRawQuery();
+        String clientIdParam = firstMatch(query, "(?:^|&)(client_id=[^&]*)");
+        String tabIdParam = firstMatch(query, "(?:^|&)(tab_id=[^&]*)");
+        assertNotNull(clientIdParam, "Keycloak's switcher URL must carry client_id, query=" + query);
+        assertNotNull(tabIdParam, "Keycloak's switcher URL must carry tab_id, query=" + query);
+
+        // 1) No routing parameters at all. A refusal is correct; a 500 is not, and neither is a
+        //    silent cookie write, which would record a language nothing is shown in.
+        HttpResponse<String> bare = follow(browser, endpointUrl + "?kc_locale=fr", null);
+        assertEquals(400, bare.statusCode(),
+            "the bare endpoint must refuse cleanly, not throw, body=" + snippet(bare.body()));
+
+        // 2) client_id and tab_id but no client_data — the shape Keycloak itself renders while a
+        //    session is logging out. This must still switch the language.
+        String noClientData = endpointUrl + "?kc_locale=fr&" + clientIdParam + "&" + tabIdParam;
+        HttpResponse<String> switched = follow(browser, noClientData, null);
+        assertEquals(200, switched.statusCode(),
+            "a switcher link without client_data must still work, body=" + snippet(switched.body()));
+        assertTrue(switched.body().contains("oid4vp-qr-img"),
+            "it must return OUR page, body=" + snippet(switched.body()));
+        assertTrue(switched.body().contains("Ce site demande"),
+            "it must come back in French, body=" + snippet(switched.body()));
+    }
+
+    /**
      * The same flow as the happy path, but the wallet answers with a tampered {@code nonce}: the
      * KB-JWT binds the presentation to a nonce other than the one the Request Object issued. The
      * presentation is otherwise perfectly valid, so only the verification engine — not a shallow
