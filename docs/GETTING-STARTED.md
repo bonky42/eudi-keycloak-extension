@@ -143,6 +143,15 @@ docker build --build-arg KC_DB=dev-file -f Containerfile -t eudi-keycloak-extens
 
 `start-dev`, as used above, overrides it anyway, so the demo is unaffected either way.
 
+Server features are a build option for the same reason. A deployment needing more than the three
+this extension requires adds them at build time, since supplying them at startup is silently
+ignored under `start --optimized`:
+
+```bash
+docker build --build-arg KC_FEATURES=oid4vc-vci,oid4vc-vci-preauth-code,oid4vc-vci-rest-credential-offer,scim-api \
+  -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+```
+
 ## When something fails
 
 Several failure messages in this ecosystem do not describe their cause — a wallet saying a document

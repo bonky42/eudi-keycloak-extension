@@ -35,11 +35,20 @@ COPY account-console/oid4vp-account/target/oid4vp-account-ui-0.1.0-SNAPSHOT.jar 
 ARG KC_DB=postgres
 
 # Without these three features, issuing our own card is inert and the unified flow collapses to the
-# PID alone. `--health-enabled` and `--metrics-enabled` are build options too, and baking them is
-# what makes `start --optimized` safe for a deployment that expects them.
+# PID alone. Features are a BUILD option like the database vendor, so a deployment that needs more
+# — SCIM provisioning, say — adds them here rather than at startup, where they are ignored:
+#
+#   docker build --build-arg KC_FEATURES=oid4vc-vci,oid4vc-vci-preauth-code,oid4vc-vci-rest-credential-offer,scim-api ...
+#
+# Names are exact and verified against `kc.sh build --help` for this release: SCIM is `scim-api`,
+# and `--features=scim` fails the build.
+ARG KC_FEATURES=oid4vc-vci,oid4vc-vci-preauth-code,oid4vc-vci-rest-credential-offer
+
+# `--health-enabled` and `--metrics-enabled` are build options too, and baking them is what makes
+# `start --optimized` safe for a deployment that expects them.
 RUN /opt/keycloak/bin/kc.sh build \
       --db="${KC_DB}" --health-enabled=true --metrics-enabled=true \
-      --features=oid4vc-vci,oid4vc-vci-preauth-code,oid4vc-vci-rest-credential-offer
+      --features="${KC_FEATURES}"
 
 # Same version as the builder above — see the pinning note.
 FROM quay.io/keycloak/keycloak:26.7.0
