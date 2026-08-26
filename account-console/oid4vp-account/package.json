@@ -11,8 +11,8 @@
     "notices": "pnpm licenses list --prod --json | node scripts/generate-notices.mjs"
   },
   "dependencies": {
-    "@keycloak/keycloak-account-ui": "26.7.0",
-    "@keycloak/keycloak-ui-shared": "26.7.0",
+    "@keycloak/keycloak-account-ui": "26.7.2",
+    "@keycloak/keycloak-ui-shared": "26.7.2",
     "@patternfly/react-core": "^5.4.14",
     "i18next": "^25.7.3",
     "react": "^18.3.1",

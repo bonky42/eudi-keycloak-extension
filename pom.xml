@@ -24,7 +24,7 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <keycloak.version>26.7.0</keycloak.version>
+    <keycloak.version>26.7.2</keycloak.version>
     <junit.version>5.10.2</junit.version>
   </properties>
 

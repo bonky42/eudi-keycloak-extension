@@ -55,7 +55,7 @@ docker run --rm -p 127.0.0.1:8080:8080 \
   -v "$PWD/oid4vp-core/target/oid4vp-core-0.1.0-SNAPSHOT.jar":/opt/keycloak/providers/oid4vp-core.jar:z \
   -v "$PWD/oid4vp-login/target/oid4vp-login-0.1.0-SNAPSHOT.jar":/opt/keycloak/providers/oid4vp-login.jar:z \
   -v "$PWD/demo/out/realm.json":/opt/keycloak/data/import/realm-oid4vp-demo.json:z \
-  quay.io/keycloak/keycloak:26.7.0 start-dev --import-realm
+  quay.io/keycloak/keycloak:26.7.2 start-dev --import-realm
 ```
 
 - Admin console: <http://localhost:8080/admin/> — `admin` / `admin`
@@ -125,12 +125,12 @@ deploying somewhere, and it assembles rather than compiles — build all three j
 the console from step 5.
 
 ```bash
-docker build -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+docker build -f Containerfile -t eudi-keycloak-extension:26.7.2 .
 
 docker run --rm -p 127.0.0.1:8080:8080 \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
   -v "$PWD/demo/out/realm.json":/opt/keycloak/data/import/realm-oid4vp-demo.json:z \
-  eudi-keycloak-extension:26.7.0 start-dev --import-realm
+  eudi-keycloak-extension:26.7.2 start-dev --import-realm
 ```
 
 **The database vendor is a build option, not a runtime one.** Under `start --optimized`, anything
@@ -138,7 +138,7 @@ not baked into the image and supplied only at startup — an environment variabl
 argument — is silently ignored. The image defaults to `postgres`; change it and you must rebuild:
 
 ```bash
-docker build --build-arg KC_DB=dev-file -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+docker build --build-arg KC_DB=dev-file -f Containerfile -t eudi-keycloak-extension:26.7.2 .
 ```
 
 `start-dev`, as used above, overrides it anyway, so the demo is unaffected either way.
@@ -149,7 +149,7 @@ ignored under `start --optimized`:
 
 ```bash
 docker build --build-arg KC_FEATURES=oid4vc-vci,oid4vc-vci-preauth-code,oid4vc-vci-rest-credential-offer,scim-api \
-  -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+  -f Containerfile -t eudi-keycloak-extension:26.7.2 .
 ```
 
 ## When something fails
