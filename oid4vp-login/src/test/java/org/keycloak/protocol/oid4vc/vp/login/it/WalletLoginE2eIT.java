@@ -218,6 +218,18 @@ class WalletLoginE2eIT {
         assertFalse(html.contains("date of birth"),
             "a claim this request does not ask for must not appear: the list is read from the DCQL "
                 + "being sent, not from a list somebody maintains, body=" + snippet(html));
+        // The requested data is the page's most consequential content, and as plain prose it read
+        // as an aside. It now sits in its own panel — and the panel has to CONTAIN its heading,
+        // not merely follow it, or the list is framed while its own label is left outside. Index
+        // order is what distinguishes the two, so it is what is asserted.
+        assertTrue(html.contains("<div id=\"oid4vp-requested\">"),
+            "the requested data must sit in its own panel, body=" + snippet(html));
+        assertTrue(html.indexOf("oid4vp-requested") < html.indexOf("oid4vp-shared-intro"),
+            "the panel must contain its heading, not follow it, body=" + snippet(html));
+        // The heading names the list; the visual grouping alone does not say so out loud.
+        assertTrue(html.contains("aria-labelledby=\"oid4vp-shared-intro\""),
+            "the list must be labelled by its heading for a screen reader, body=" + snippet(html));
+
         assertTrue(html.contains("data-ttl-seconds=\"120\""),
             "the countdown needs the TTL the transaction was created with, body=" + snippet(html));
 
