@@ -494,6 +494,50 @@ class WalletLoginE2eIT {
     }
 
     /**
+     * The administration API must refuse an incoherent provider configuration, with a message.
+     *
+     * <p><b>This is the only test that proves the wiring.</b> The rules live in
+     * {@code Oid4vpIdentityProviderConfig} and their unit tests instantiate that class directly, so
+     * they would stay green even if {@code createConfig()} returned a bare
+     * {@code IdentityProviderModel} and Keycloak never called any of them. Only a real server,
+     * asked to save a real configuration, shows whether {@code validate} is on the path at all.</p>
+     *
+     * <p>It asserts the message too, not just the status. A 400 alone is what Keycloak answers for
+     * a malformed request of any kind; what has to reach the administrator is the sentence naming
+     * the field to fill.</p>
+     *
+     * <p>It lives in this class to share its container rather than pay another minute of startup
+     * for one exchange. It creates nothing that survives: the provider is refused, which is the
+     * point.</p>
+     */
+    @Test
+    void theAdminApiRefusesAProviderMissingWhatItCannotWorkWithout() throws Exception {
+        HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+        JsonNode token = formPost(http, baseUrl + "/realms/master/protocol/openid-connect/token",
+            "grant_type=password&client_id=admin-cli&username=admin&password=admin", null);
+        String bearer = token.get("access_token").asText();
+
+        // Everything the provider needs except the trust anchors, so the refusal can only come from
+        // the rule under test and not from a generally malformed request.
+        String body = """
+            {"alias":"oid4vp-incomplete","providerId":"oid4vp","enabled":true,
+             "config":{"signingKeyPem":"x","signingCertPem":"x","dcqlQueryJson":"{}"}}""";
+
+        HttpResponse<String> created = exchange(http,
+            HttpRequest.newBuilder(URI.create(baseUrl + "/admin/realms/" + REALM + "/identity-provider/instances"))
+                .header("Authorization", "Bearer " + bearer)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body)));
+
+        assertEquals(400, created.statusCode(),
+            "saving a provider that cannot work must be refused, not stored; body="
+                + snippet(created.body()));
+        assertTrue(created.body().contains("Trust Anchors (PEM)"),
+            "the refusal must name the field to fill, as the form labels it; body="
+                + snippet(created.body()));
+    }
+
+    /**
      * The same flow as the happy path, but the wallet answers with a tampered {@code nonce}: the
      * KB-JWT binds the presentation to a nonce other than the one the Request Object issued. The
      * presentation is otherwise perfectly valid, so only the verification engine — not a shallow

@@ -93,4 +93,49 @@ class Oid4vpIdentityProviderFactoryTest {
         }
         assertTrue(found, "services resource must reference " + Oid4vpIdentityProviderFactory.class.getName());
     }
+
+    /**
+     * Without this, every rule in {@link Oid4vpIdentityProviderConfig} is dead code in production.
+     *
+     * <p>Keycloak reaches {@code validate} through the model that {@code createConfig()} hands
+     * back; returning a bare {@code IdentityProviderModel} would leave the unit tests of those
+     * rules perfectly green while nothing ever called them. This assertion is the wiring, and it is
+     * the one worth having.</p>
+     */
+    @Test
+    void createConfigReturnsTheModelThatValidates() {
+        assertInstanceOf(Oid4vpIdentityProviderConfig.class,
+            new Oid4vpIdentityProviderFactory().createConfig(),
+            "createConfig must return the validating model, or no rule is ever enforced");
+    }
+
+    /**
+     * The declaration and the enforcement must name the same fields.
+     *
+     * <p>The console drops the flag when it renders a third-party provider — measured against
+     * 26.7.2 — so nothing shows today. It is declared anyway: it travels in the payload the console
+     * already fetches, so whatever renders it later reads this list rather than restating it.</p>
+     */
+    @Test
+    void thePropertiesMarkedRequiredAreExactlyTheOnesValidateDemands() {
+        Set<String> marked = new Oid4vpIdentityProviderFactory().getConfigProperties().stream()
+            .filter(ProviderConfigProperty::isRequired)
+            .map(ProviderConfigProperty::getName)
+            .collect(Collectors.toSet());
+
+        assertEquals(Oid4vpIdentityProviderConfig.REQUIRED_FIELDS.keySet(), marked,
+            "a field demanded by validate but not marked, or the reverse, is a form that disagrees "
+                + "with the server about what is mandatory");
+    }
+
+    /** A refusal naming a label the form does not use sends the reader hunting for nothing. */
+    @Test
+    void theRequiredFieldLabelsMatchThePropertyLabels() {
+        var labels = new Oid4vpIdentityProviderFactory().getConfigProperties().stream()
+            .collect(Collectors.toMap(ProviderConfigProperty::getName, ProviderConfigProperty::getLabel));
+
+        Oid4vpIdentityProviderConfig.REQUIRED_FIELDS.forEach((key, label) ->
+            assertEquals(labels.get(key), label,
+                "the message for " + key + " names a label the form does not use"));
+    }
 }
