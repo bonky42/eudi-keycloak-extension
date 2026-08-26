@@ -14,6 +14,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriBuilder;
 
 import org.keycloak.broker.provider.AbstractIdentityProvider;
 import org.keycloak.broker.provider.AuthenticationRequest;
@@ -605,6 +606,16 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
             KeycloakSession session = provider.session;
             RealmModel realm = session.getContext().getRealm();
 
+            // Routing parameters first, and before any side effect. Without them there is no flow
+            // to resume, so setting the cookie would leave a half-applied change behind — the
+            // language recorded, nothing shown in it. They also cannot be passed through as null:
+            // JAX-RS requires UriBuilder.replaceQueryParam to reject a null value, so handing them
+            // to the restart builder unchecked answers 500. Observed in production on 2026-08-26,
+            // by probing this very route without them.
+            if (clientId == null || clientId.isBlank() || tabId == null || tabId.isBlank()) {
+                return Response.status(Response.Status.BAD_REQUEST).build();
+            }
+
             if (realm.isInternationalizationEnabled() && requestedLocale != null
                 && realm.getSupportedLocalesStream().anyMatch(requestedLocale::equals)) {
                 session.getProvider(LocaleUpdaterProvider.class).updateLocaleCookie(requestedLocale);
@@ -617,10 +628,19 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
             // (LoginActionsService.restartSession), and re-verified unchanged in 26.7.2 — same
             // guard, same offsets. Re-check it on the next server upgrade: nothing fails loudly if
             // this flips, the holder is simply signed out elsewhere.
-            URI restart = Urls.realmLoginRestartPage(
+            //
+            // client_data is genuinely optional, and absent is not the same as empty:
+            // FreeMarkerLoginFormsProvider.prepareBaseUriBuilder omits it while the session is
+            // logging out, so a switcher link rendered then carries no such parameter. It is
+            // therefore removed rather than sent blank — Keycloak reads an absent one as null,
+            // which is what that state means.
+            UriBuilder restart = UriBuilder.fromUri(Urls.realmLoginRestartPage(
                 session.getContext().getUri().getBaseUri(), realm.getName(),
-                clientId, tabId, clientData, true);
-            return Response.status(Response.Status.FOUND).location(restart).build();
+                clientId, tabId, clientData == null ? "" : clientData, true));
+            if (clientData == null) {
+                restart.replaceQueryParam("client_data");
+            }
+            return Response.status(Response.Status.FOUND).location(restart.build()).build();
         }
 
         /**
