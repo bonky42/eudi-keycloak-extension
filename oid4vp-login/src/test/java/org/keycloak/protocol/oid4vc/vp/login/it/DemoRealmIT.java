@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Proves that the realm produced by {@code scripts/prepare-demo} actually works: it imports into a
- * real Keycloak 26.7.0 carrying the extension, and its login page renders a server-side QR.
+ * real Keycloak 26.7.2 carrying the extension, and its login page renders a server-side QR.
  *
  * <p>The test drives the <em>real</em> script rather than generating equivalent PKI in Java. A
  * test that reimplements the script's intent in another language leaves the script itself
@@ -59,7 +59,7 @@ class DemoRealmIT {
         assertTrue(Files.isRegularFile(loginJar), "provider JAR missing (run via `verify`, not `test`): " + loginJar);
         assertTrue(Files.isRegularFile(coreJar), "provider JAR missing (run via `verify`, not `test`): " + coreJar);
 
-        keycloak = new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:26.7.0"))
+        keycloak = new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:26.7.2"))
             .withExposedPorts(8080)
             .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
             .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")

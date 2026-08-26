@@ -122,7 +122,7 @@ To assemble a runtime image once the jars are built — `docker build` and `podm
 the same file:
 
 ```bash
-docker build -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+docker build -f Containerfile -t eudi-keycloak-extension:26.7.2 .
 ```
 
 Full walkthrough, including running it and signing in: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).

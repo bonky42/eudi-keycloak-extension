@@ -1,4 +1,4 @@
-# The RUNTIME image: Keycloak 26.7.0 carrying the OID4VP extension.
+# The RUNTIME image: Keycloak 26.7.2 carrying the OID4VP extension.
 #
 # Not to be confused with tools/account-console/Containerfile.node, which builds the account
 # console. This one assembles; it compiles nothing. Build the three jars first — see
@@ -6,14 +6,14 @@
 #
 # `docker build` and `podman build` consume this identically:
 #
-#   docker build -f Containerfile -t eudi-keycloak-extension:26.7.0 .
+#   docker build -f Containerfile -t eudi-keycloak-extension:26.7.2 .
 #
 # The version is pinned, never `latest`. Part of this extension was built by disassembling the
 # bytecode of this precise release — VerifiableCredentialOfferActionConfig, and the order in which
 # required actions are evaluated. A version drift would not fail at compile time; it would fail in
 # operation. Source of truth: <keycloak.version> in pom.xml. The two FROM lines below must be kept
 # aligned with it by hand.
-FROM quay.io/keycloak/keycloak:26.7.0 AS builder
+FROM quay.io/keycloak/keycloak:26.7.2 AS builder
 
 # Explicit paths, never a wildcard: `oid4vp-core-*.jar` would also carry
 # `oid4vp-core-0.1.0-SNAPSHOT-tests.jar`, which is the simulated wallet and its deliberate cheat
@@ -51,6 +51,6 @@ RUN /opt/keycloak/bin/kc.sh build \
       --features="${KC_FEATURES}"
 
 # Same version as the builder above — see the pinning note.
-FROM quay.io/keycloak/keycloak:26.7.0
+FROM quay.io/keycloak/keycloak:26.7.2
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
 ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]

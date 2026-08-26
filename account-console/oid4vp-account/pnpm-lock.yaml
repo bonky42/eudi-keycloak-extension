@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@keycloak/keycloak-account-ui':
-        specifier: 26.7.0
-        version: 26.7.0(typescript@5.5.4)
+        specifier: 26.7.2
+        version: 26.7.2(typescript@5.5.4)
       '@keycloak/keycloak-ui-shared':
-        specifier: 26.7.0
-        version: 26.7.0(typescript@5.5.4)
+        specifier: 26.7.2
+        version: 26.7.2(typescript@5.5.4)
       '@patternfly/patternfly':
         specifier: ^5.4.2
         version: 5.4.2
@@ -264,19 +264,19 @@ packages:
     resolution: {integrity: sha512-6EwiSjwWYP7pTckG6I5eyFANjPhmPjUX9JRLUSfNPC7FX7zK9gyZAfUEaECL6ALTpGX5AjnBq3C9XmVWPitNpw==}
     deprecated: Use @eslint/object-schema instead
 
-  '@keycloak/keycloak-account-ui@26.7.0':
-    resolution: {integrity: sha512-rzljc5H+XcQMpDcYAFvzjhUVu/b0qQ3Mvj8Ce1BrOQGdKy4DDwOpV68tzrmeMQKKUzWo9kNfssp00mhZqVeYQg==}
+  '@keycloak/keycloak-account-ui@26.7.2':
+    resolution: {integrity: sha512-qioHEAu0ING8dYEhhbb3IxqENUBIFGhM4RMxZP6QLniUFZebFEOTpN9Jsy5uCWYkppXsqFzpagcQ/ddpJh/t7g==}
 
   '@keycloak/keycloak-admin-client@25.0.4':
     resolution: {integrity: sha512-mZVFwly7cHZq1XpvJrrOutU0qrUbGo8NUdpb7PS4309x8yG2a4/WyZfh2lgiopBRQ6R/b24RsuHa4GetQPqT+g==}
     engines: {node: '>=18'}
 
-  '@keycloak/keycloak-admin-client@26.7.0':
-    resolution: {integrity: sha512-QEsX19sFCvknBzV2zelEkZ7waglCqzayY1zDtoRQinHuUiAe2f7q+xXT6R8XNukn+rShB41TOlG4QR2Bt6hxhw==}
+  '@keycloak/keycloak-admin-client@26.7.2':
+    resolution: {integrity: sha512-pnuUTXVv4dJUBYKofbfniNp9pm+lEGGVnDwXJ6vmHo8wiJiLHRgy8kgmZteqWH5yRX5LR0DvPAVnCCdfGf5Bcg==}
     engines: {node: '>=18'}
 
-  '@keycloak/keycloak-ui-shared@26.7.0':
-    resolution: {integrity: sha512-EA3CDka3F378WT91p/NnXMf7ds0r7qRvNFF00BpWf+URRqJnIKxM4LJ+a1COD/VEWOR4VtLEyNCeiK+6W0+8yg==}
+  '@keycloak/keycloak-ui-shared@26.7.2':
+    resolution: {integrity: sha512-OFCbSFOizUufSpREqahSFkLQBaM3H+PO0TccriOmydTd8sq6pblJ+2GY/t9xljBMua2uaEpUKsZNTFy80iuMoQ==}
 
   '@microsoft/kiota-abstractions@1.0.0-preview.103':
     resolution: {integrity: sha512-om7nKH8nWyEAQ0lgbIdKdrkmznhkdDJdliCnAIo31X/hlUah1aBzvfUx+pbyp67Q040yLK+2J6P7AnvGSoN/qQ==}
@@ -1624,9 +1624,9 @@ snapshots:
   '@humanwhocodes/object-schema@2.0.2':
     optional: true
 
-  '@keycloak/keycloak-account-ui@26.7.0(typescript@5.5.4)':
+  '@keycloak/keycloak-account-ui@26.7.2(typescript@5.5.4)':
     dependencies:
-      '@keycloak/keycloak-ui-shared': 26.7.0(typescript@5.5.4)
+      '@keycloak/keycloak-ui-shared': 26.7.2(typescript@5.5.4)
       '@patternfly/patternfly': 5.4.2
       '@patternfly/react-core': 5.4.14(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@patternfly/react-icons': 5.4.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1650,7 +1650,7 @@ snapshots:
       url-join: 5.0.0
       url-template: 3.1.1
 
-  '@keycloak/keycloak-admin-client@26.7.0':
+  '@keycloak/keycloak-admin-client@26.7.2':
     dependencies:
       '@microsoft/kiota-abstractions': 1.0.0-preview.103
       '@microsoft/kiota-http-fetchlibrary': 1.0.0-preview.103
@@ -1661,9 +1661,9 @@ snapshots:
       camelize-ts: 3.0.0
       url-template: 3.1.1
 
-  '@keycloak/keycloak-ui-shared@26.7.0(typescript@5.5.4)':
+  '@keycloak/keycloak-ui-shared@26.7.2(typescript@5.5.4)':
     dependencies:
-      '@keycloak/keycloak-admin-client': 26.7.0
+      '@keycloak/keycloak-admin-client': 26.7.2
       '@patternfly/react-core': 5.4.14(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@patternfly/react-icons': 5.4.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@patternfly/react-styles': 5.4.1
