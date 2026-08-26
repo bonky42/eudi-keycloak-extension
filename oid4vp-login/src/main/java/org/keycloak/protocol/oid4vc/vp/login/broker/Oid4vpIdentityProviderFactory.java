@@ -81,9 +81,21 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
             new ProviderConfigProperty(
                 Oid4vpConfig.TTL_SECONDS,
                 "Transaction TTL (seconds)",
-                "How long a presentation transaction stays valid before expiring.",
+                "How long a presentation transaction stays valid before expiring. The login page "
+                    + "counts it down, so a holder knows how long they have to reach their wallet.",
                 ProviderConfigProperty.STRING_TYPE,
                 "120"),
+            new ProviderConfigProperty(
+                Oid4vpConfig.REQUEST_PURPOSE,
+                "Request Purpose",
+                "Why this site is asking, shown to the holder on the login page before they open "
+                    + "their wallet. OpenID4VP 1.0 section 6.2 asks for this and defines no way to "
+                    + "send it to the wallet, so this page is the only place it can appear. Takes "
+                    + "either literal text or a message key of the form ${myKey}, resolved against "
+                    + "the login theme's bundle — the same convention as the consent screen. Clear "
+                    + "the field to show nothing.",
+                ProviderConfigProperty.STRING_TYPE,
+                "${oid4vpDefaultPurpose}"),
             new ProviderConfigProperty(
                 Oid4vpConfig.SUBJECT_CLAIM,
                 "Subject Claim",
