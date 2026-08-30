@@ -58,12 +58,7 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
                 "PEM-encoded certificate(s) trusted as roots for issuer/credential validation.",
                 ProviderConfigProperty.TEXT_TYPE,
                 null),
-            new ProviderConfigProperty(
-                Oid4vpConfig.SIGNING_KEY_PEM,
-                "Signing Key (PEM)",
-                "PEM-encoded PKCS#8 EC private key used to sign the authorization request.",
-                ProviderConfigProperty.TEXT_TYPE,
-                null),
+            signingKeyProperty(),
             new ProviderConfigProperty(
                 Oid4vpConfig.SIGNING_CERT_PEM,
                 "Signing Certificate (PEM)",
@@ -160,6 +155,28 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
             .forEach(property -> property.setRequired(true));
 
         return properties;
+    }
+
+    /**
+     * The only field here that must not be read back by anyone who can open the console.
+     *
+     * <p>{@code setSecret} is what Keycloak offers to say so, and what it buys has to be stated
+     * plainly: for a COMPONENT the server replaces a secret value with asterisks on its way out,
+     * but a broker goes through {@code StripSecretsUtils.stripBroker}, which takes no session and
+     * therefore cannot look a provider's declared properties up — it masks {@code clientSecret} and
+     * {@code authTokenClientSecret} by name and nothing else. So this flag does NOT keep the key on
+     * the server; it travels to the console as part of the descriptor, and the OID4VP settings page
+     * uses it to keep the key off the screen until it is asked for.</p>
+     */
+    private static ProviderConfigProperty signingKeyProperty() {
+        ProviderConfigProperty property = new ProviderConfigProperty(
+            Oid4vpConfig.SIGNING_KEY_PEM,
+            "Signing Key (PEM)",
+            "PEM-encoded PKCS#8 EC private key used to sign the authorization request.",
+            ProviderConfigProperty.TEXT_TYPE,
+            null);
+        property.setSecret(true);
+        return property;
     }
 
     private static ProviderConfigProperty subjectPolicyProperty() {
