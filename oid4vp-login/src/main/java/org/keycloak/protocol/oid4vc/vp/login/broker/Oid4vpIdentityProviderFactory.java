@@ -6,6 +6,7 @@ import org.keycloak.models.KeycloakSession;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
 import org.keycloak.provider.ProviderConfigProperty;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -37,7 +38,10 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
 
     @Override
     public IdentityProviderModel createConfig() {
-        return new IdentityProviderModel();
+        // NOT a bare IdentityProviderModel. Keycloak reaches validate() through whatever this
+        // returns, so a plain model would leave every rule in Oid4vpIdentityProviderConfig
+        // unreachable while its unit tests stayed green.
+        return new Oid4vpIdentityProviderConfig();
     }
 
     @Override
@@ -47,7 +51,7 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
 
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        return List.of(
+        List<ProviderConfigProperty> properties = new ArrayList<>(List.of(
             new ProviderConfigProperty(
                 Oid4vpConfig.TRUST_ANCHORS_PEM,
                 "Trust Anchors (PEM)",
@@ -145,7 +149,17 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
                     + "Used to resolve the holder's entitlement (UserVerifiableCredentialModel) so a "
                     + "revoked holder can no longer authenticate with an already-issued card.",
                 ProviderConfigProperty.STRING_TYPE,
-                null));
+                null)));
+
+        // Marked from the one list that also decides what validate() demands, so the form and the
+        // server can never disagree about what is mandatory. Keycloak 26.7.2 does not render this
+        // for a third-party provider — measured — but it does put it in the payload the console
+        // fetches, which is where anything drawing the asterisks later will read it.
+        properties.stream()
+            .filter(property -> Oid4vpIdentityProviderConfig.REQUIRED_FIELDS.containsKey(property.getName()))
+            .forEach(property -> property.setRequired(true));
+
+        return properties;
     }
 
     private static ProviderConfigProperty subjectPolicyProperty() {
