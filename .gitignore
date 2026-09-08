@@ -12,3 +12,9 @@ account-console/oid4vp-account/node_modules/
 account-console/oid4vp-account/dist/
 account-console/oid4vp-account/target/
 account-console/oid4vp-account/generated/
+
+# Rebuilt admin console: same reproducible outputs as the account console above.
+admin-console/oid4vp-admin/node_modules/
+admin-console/oid4vp-admin/dist/
+admin-console/oid4vp-admin/target/
+admin-console/oid4vp-admin/generated/
