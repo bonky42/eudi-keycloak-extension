@@ -25,11 +25,21 @@ public final class VerifierClientId {
      * @return the {@code client_id}, as {@code x509_hash:<fingerprint>}
      */
     public static String x509Hash(X509Certificate signerCert) {
+        return SCHEME + fingerprint(signerCert);
+    }
+
+    /**
+     * The bare fingerprint behind {@link #x509Hash}: SHA-256 of the DER, base64url without padding.
+     *
+     * <p>Exposed so that whatever else has to name this certificate names it by the same value the
+     * wallet is told. Two places computing one fingerprint is one place too many.
+     */
+    public static String fingerprint(X509Certificate certificate) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(signerCert.getEncoded());
-            return SCHEME + Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(certificate.getEncoded());
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to derive client_id from signer certificate", e);
+            throw new IllegalStateException("Failed to derive fingerprint from certificate", e);
         }
     }
 }
