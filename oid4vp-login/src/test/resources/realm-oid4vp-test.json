@@ -7,23 +7,60 @@
   "duplicateEmailsAllowed": false,
   "verifiableCredentialsEnabled": true,
   "internationalizationEnabled": true,
-  "supportedLocales": ["en", "fr"],
+  "supportedLocales": [
+    "en",
+    "fr"
+  ],
   "defaultLocale": "en",
   "components": {
     "org.keycloak.keys.KeyProvider": [
       {
+        "id": "oid4vp-verifier-key-test",
+        "name": "oid4vp-verifier",
+        "providerId": "oid4vp-verifier-key",
+        "config": {
+          "priority": [
+            "0"
+          ],
+          "privateKeyPem": [
+            "@@SIGNING_KEY_PEM@@"
+          ],
+          "certificatePem": [
+            "@@SIGNING_CERT_PEM@@"
+          ]
+        }
+      },
+      {
         "name": "oid4vp-card-issuer",
         "providerId": "java-keystore",
         "config": {
-          "active": ["true"],
-          "enabled": ["true"],
-          "priority": ["0"],
-          "algorithm": ["ES256"],
-          "keystore": ["/opt/keycloak/data/oid4vp-test/card-issuer.p12"],
-          "keystoreType": ["PKCS12"],
-          "keystorePassword": ["changeit"],
-          "keyAlias": ["card-issuer"],
-          "keyPassword": ["changeit"]
+          "active": [
+            "true"
+          ],
+          "enabled": [
+            "true"
+          ],
+          "priority": [
+            "0"
+          ],
+          "algorithm": [
+            "ES256"
+          ],
+          "keystore": [
+            "/opt/keycloak/data/oid4vp-test/card-issuer.p12"
+          ],
+          "keystoreType": [
+            "PKCS12"
+          ],
+          "keystorePassword": [
+            "changeit"
+          ],
+          "keyAlias": [
+            "card-issuer"
+          ],
+          "keyPassword": [
+            "changeit"
+          ]
         }
       }
     ]
@@ -40,8 +77,12 @@
       "secret": "@@CLIENT_SECRET@@",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
-      "redirectUris": ["*"],
-      "webOrigins": ["*"],
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
       "fullScopeAllowed": true,
       "protocolMappers": [
         {
@@ -75,8 +116,7 @@
       "config": {
         "trustAnchorsPem": "@@TRUST_ANCHORS_PEM@@",
         "ownIssuerAnchorsPem": "@@OWN_ISSUER_ANCHORS_PEM@@",
-        "signingKeyPem": "@@SIGNING_KEY_PEM@@",
-        "signingCertPem": "@@SIGNING_CERT_PEM@@",
+        "signingKeyRef": "oid4vp-verifier-key-test",
         "dcqlQueryJson": "@@DCQL_QUERY_JSON@@",
         "matchingClaim": "email",
         "subjectClaim": "sub",

@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -71,11 +72,23 @@ class PrepareDemoTest {
         assertEquals("oid4vp", idp.get("providerId").asText());
         JsonNode config = idp.get("config");
 
+        // The signing material lives in a realm key component now; the provider only names it.
+        JsonNode verifierKey = null;
+        for (JsonNode component : realm.get("components").get("org.keycloak.keys.KeyProvider")) {
+            if ("oid4vp-verifier-key".equals(component.get("providerId").asText())) {
+                verifierKey = component.get("config");
+            }
+        }
+        assertNotNull(verifierKey, "the demo realm must carry the verifier's key as a component");
         // The PEM survived the fold into a JSON string value: still a PEM, still multi-line.
-        for (String key : new String[]{"signingKeyPem", "signingCertPem", "trustAnchorsPem"}) {
-            String pem = config.get(key).asText();
-            assertTrue(pem.startsWith("-----BEGIN "), key + " is not PEM: " + pem);
-            assertTrue(pem.contains("\n"), key + " lost its line breaks");
+        assertEquals("oid4vp-verifier-key-demo", config.get("signingKeyRef").asText(),
+            "the provider must point at the component that holds the key");
+        for (JsonNode pemNode : new JsonNode[]{verifierKey.get("privateKeyPem").get(0),
+                                               verifierKey.get("certificatePem").get(0),
+                                               config.get("trustAnchorsPem")}) {
+            String pem = pemNode.asText();
+            assertTrue(pem.startsWith("-----BEGIN "), "not PEM: " + pem);
+            assertTrue(pem.contains("\n"), "lost its line breaks");
         }
 
         // Recognition-only: issuance must stay off.
@@ -84,7 +97,8 @@ class PrepareDemoTest {
 
         // The verifier certificate and the trust anchor are opposite roles, and must not be the
         // same certificate.
-        assertNotEquals(config.get("signingCertPem").asText(), config.get("trustAnchorsPem").asText(),
+        assertNotEquals(verifierKey.get("certificatePem").get(0).asText(),
+            config.get("trustAnchorsPem").asText(),
             "the verifier certificate must not double as the issuer trust anchor");
     }
 

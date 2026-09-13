@@ -6,7 +6,10 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "internationalizationEnabled": true,
-  "supportedLocales": ["en", "fr"],
+  "supportedLocales": [
+    "en",
+    "fr"
+  ],
   "defaultLocale": "en",
   "components": {
     "org.keycloak.userprofile.UserProfileProvider": [
@@ -16,6 +19,24 @@
         "config": {
           "kc.user.profile.config": [
             "{\"attributes\":[{\"name\":\"username\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"lastName\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"unmanagedAttributePolicy\":\"ENABLED\"}"
+          ]
+        }
+      }
+    ],
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "id": "oid4vp-verifier-key-demo",
+        "name": "oid4vp-verifier",
+        "providerId": "oid4vp-verifier-key",
+        "config": {
+          "priority": [
+            "0"
+          ],
+          "privateKeyPem": [
+            "@@SIGNING_KEY_PEM@@"
+          ],
+          "certificatePem": [
+            "@@SIGNING_CERT_PEM@@"
           ]
         }
       }
@@ -29,8 +50,12 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost/demo/callback"],
-      "webOrigins": ["+"]
+      "redirectUris": [
+        "http://localhost/demo/callback"
+      ],
+      "webOrigins": [
+        "+"
+      ]
     }
   ],
   "identityProviders": [
@@ -47,8 +72,7 @@
       "firstBrokerLoginFlowAlias": "first broker login",
       "config": {
         "trustAnchorsPem": "@@TRUST_ANCHORS_PEM@@",
-        "signingKeyPem": "@@SIGNING_KEY_PEM@@",
-        "signingCertPem": "@@SIGNING_CERT_PEM@@",
+        "signingKeyRef": "oid4vp-verifier-key-demo",
         "dcqlQueryJson": "{\"credentials\":[{\"id\":\"pid\",\"format\":\"dc+sd-jwt\",\"meta\":{\"vct_values\":[\"urn:eudi:pid:1\"]},\"claims\":[{\"path\":[\"sub\"]},{\"path\":[\"email\"]},{\"path\":[\"given_name\"]},{\"path\":[\"family_name\"]},{\"path\":[\"age_over_18\"]}]}],\"credential_sets\":[{\"required\":true,\"options\":[[\"pid\"]]}]}",
         "matchingClaim": "email",
         "subjectClaim": "sub",

@@ -51,8 +51,6 @@ public class Oid4vpIdentityProviderConfig extends IdentityProviderModel {
     static {
         Map<String, String> required = new LinkedHashMap<>();
         required.put(Oid4vpConfig.TRUST_ANCHORS_PEM, "Trust Anchors (PEM)");
-        required.put(Oid4vpConfig.SIGNING_KEY_PEM, "Signing Key (PEM)");
-        required.put(Oid4vpConfig.SIGNING_CERT_PEM, "Signing Certificate (PEM)");
         required.put(Oid4vpConfig.DCQL_QUERY_JSON, "DCQL Query (JSON)");
         REQUIRED_FIELDS = Collections.unmodifiableMap(required);
     }
@@ -75,6 +73,21 @@ public class Oid4vpIdentityProviderConfig extends IdentityProviderModel {
         // fallback to the PID — so a legitimate holder is locked out entirely. The same
         // inconsistency is already reported at authentication time; saying it at save time is the
         // only version an administrator hears.
+        // Signing material, one way or the other. Not in REQUIRED_FIELDS because that list is one
+        // field to one asterisk, and this is a choice between two shapes: a realm key named here,
+        // or the legacy pair pasted below. Whether the named key EXISTS is deliberately not checked
+        // — validate() runs during realm import before any component exists, and a rule that reads
+        // the realm would stop a correct realm from importing. Measured, 2026-09-08: the same
+        // exception answers 400 on the admin path, 500 on an API import, and stops the server
+        // outright on --import-realm.
+        if (!isSet(Oid4vpConfig.SIGNING_KEY_REF)
+            && !(isSet(Oid4vpConfig.SIGNING_KEY_PEM) && isSet(Oid4vpConfig.SIGNING_CERT_PEM))) {
+            throw new IllegalArgumentException(
+                "This provider needs something to sign its requests with: name a realm key in "
+                    + "'Signing Key (realm key)', or fill both 'Signing Key (PEM)' and "
+                    + "'Signing Certificate (PEM)'");
+        }
+
         if (isSet(Oid4vpConfig.OWN_VCT) && !isSet(Oid4vpConfig.OWN_ISSUER_ANCHORS_PEM)) {
             throw new IllegalArgumentException(
                 "'Own Issuer Anchors (PEM)' is required when 'Own Credential Type (vct)' is set: "
