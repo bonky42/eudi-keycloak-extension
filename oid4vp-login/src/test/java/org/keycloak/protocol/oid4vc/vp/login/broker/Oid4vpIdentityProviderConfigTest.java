@@ -78,6 +78,48 @@ class Oid4vpIdentityProviderConfigTest {
      * function and leaves the rest alone; demanding a transaction TTL when 120 seconds is already
      * the answer would only teach administrators that the rules are arbitrary.
      */
+    /**
+     * The signing material is a choice between two shapes, so it is a rule rather than a required
+     * field: name a realm key, or paste the pair. Naming a key is enough on its own — the PEM
+     * fields being empty is the normal state once the key has moved.
+     */
+    @Test
+    void namingARealmKeyIsEnoughOnItsOwn() {
+        Oid4vpIdentityProviderConfig config = complete();
+        config.getConfig().remove(Oid4vpConfig.SIGNING_KEY_PEM);
+        config.getConfig().remove(Oid4vpConfig.SIGNING_CERT_PEM);
+        config.getConfig().put(Oid4vpConfig.SIGNING_KEY_REF, "a-key-component");
+
+        assertDoesNotThrow(() -> config.validate(null));
+    }
+
+    @Test
+    void thePastedPairIsStillAccepted() {
+        Oid4vpIdentityProviderConfig config = complete();
+
+        assertDoesNotThrow(() -> config.validate(null));
+    }
+
+    @Test
+    void aProviderWithNothingToSignWithIsRefused() {
+        Oid4vpIdentityProviderConfig config = complete();
+        config.getConfig().remove(Oid4vpConfig.SIGNING_KEY_PEM);
+        config.getConfig().remove(Oid4vpConfig.SIGNING_CERT_PEM);
+
+        IllegalArgumentException refusal =
+            assertThrows(IllegalArgumentException.class, () -> config.validate(null));
+        assertTrue(refusal.getMessage().contains("sign"), refusal.getMessage());
+    }
+
+    /** Half the legacy pair is not a shape: it would fail at the first login, not at save time. */
+    @Test
+    void aPastedKeyWithoutItsCertificateIsRefused() {
+        Oid4vpIdentityProviderConfig config = complete();
+        config.getConfig().remove(Oid4vpConfig.SIGNING_CERT_PEM);
+
+        assertThrows(IllegalArgumentException.class, () -> config.validate(null));
+    }
+
     @Test
     void fieldsThatHaveDefaultsAreNotDemanded() {
         assertDoesNotThrow(() -> complete().validate(null),

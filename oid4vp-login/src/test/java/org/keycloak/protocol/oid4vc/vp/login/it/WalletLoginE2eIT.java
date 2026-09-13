@@ -538,6 +538,40 @@ class WalletLoginE2eIT {
     }
 
     /**
+     * The other half of the same wiring: a provider with nothing to sign its requests with.
+     *
+     * <p>Unlike the required-field rule above, this one is a choice between two shapes — a realm key
+     * named, or the legacy pair pasted — so it lives in {@code validate} as a cross-field rule and
+     * not in {@code REQUIRED_FIELDS}. Its unit tests instantiate the config class directly and would
+     * stay green whether or not Keycloak ever reached it. Only a real server saving a real
+     * configuration shows that it is on the path.</p>
+     */
+    @Test
+    void theAdminApiRefusesAProviderWithNothingToSignWith() throws Exception {
+        HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+        JsonNode token = formPost(http, baseUrl + "/realms/master/protocol/openid-connect/token",
+            "grant_type=password&client_id=admin-cli&username=admin&password=admin", null);
+        String bearer = token.get("access_token").asText();
+
+        // Anchors and query present, so the refusal can only be about the signing material.
+        String body = """
+            {"alias":"oid4vp-unsigned","providerId":"oid4vp","enabled":true,
+             "config":{"trustAnchorsPem":"-----BEGIN CERTIFICATE-----\\nx\\n-----END CERTIFICATE-----",
+                       "dcqlQueryJson":"{}"}}""";
+
+        HttpResponse<String> created = exchange(http,
+            HttpRequest.newBuilder(URI.create(baseUrl + "/admin/realms/" + REALM + "/identity-provider/instances"))
+                .header("Authorization", "Bearer " + bearer)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body)));
+
+        assertEquals(400, created.statusCode(),
+            "a provider that cannot sign anything must be refused; body=" + snippet(created.body()));
+        assertTrue(created.body().contains("sign"),
+            "the refusal must say what is missing; body=" + snippet(created.body()));
+    }
+
+    /**
      * The same flow as the happy path, but the wallet answers with a tampered {@code nonce}: the
      * KB-JWT binds the presentation to a nonce other than the one the Request Object issued. The
      * presentation is otherwise perfectly valid, so only the verification engine — not a shallow
