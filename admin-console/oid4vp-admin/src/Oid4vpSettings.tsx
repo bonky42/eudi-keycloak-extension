@@ -12,6 +12,7 @@ import {
 import {
   KeycloakSpinner,
   ScrollForm,
+  SelectControl,
   SwitchControl,
   TextControl,
   useAlerts,
@@ -30,9 +31,17 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, FormProvider, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { CertificatePanel, type CertificateSummary } from "./CertificatePanel";
+import type ComponentRepresentation from "@keycloak/keycloak-admin-client/lib/defs/componentRepresentation";
 import { ConfigField } from "./ConfigFields";
 
 const PROVIDER_ID = "oid4vp";
+
+/** The key provider whose components can sign this provider's requests. */
+const KEY_PROVIDER_ID = "oid4vp-verifier-key";
+const KEY_COMPONENT_TYPE = "org.keycloak.keys.KeyProvider";
+const SIGNING_KEY_REF = "signingKeyRef";
+
 
 /**
  * Field ORDER and grouping — never which fields exist.
@@ -119,6 +128,8 @@ export const Oid4vpSettings = ({ mode }: { mode: "add" | "edit" }) => {
   const { addAlert, addError } = useAlerts();
 
   const [provider, setProvider] = useState<IdentityProviderRepresentation>();
+  const [keys, setKeys] = useState<ComponentRepresentation[]>([]);
+  const [certificate, setCertificate] = useState<CertificateSummary | "none" | "broken">();
 
   const form = useForm<FormValues>({
     defaultValues: { alias: PROVIDER_ID, enabled: true, config: {}, [ISSUANCE_SWITCH]: false },
@@ -153,6 +164,51 @@ export const Oid4vpSettings = ({ mode }: { mode: "add" | "edit" }) => {
       setProvider(found);
     },
     [mode, aliasParam],
+  );
+
+  // Both routes render this same component, so React keeps it mounted when one replaces the other
+  // and the form keeps whatever the previous page put in it. Reaching "Add provider" from an edit
+  // page showed the edited provider's values — including, since the selector exists, a key
+  // belonging to another realm.
+  useEffect(() => {
+    if (mode === "add") {
+      reset({ alias: PROVIDER_ID, enabled: true, config: {}, [ISSUANCE_SWITCH]: false });
+      setProvider(undefined);
+      setCertificate(undefined);
+    }
+  }, [mode, realm, reset]);
+
+  // The keys this provider may name. Fetched rather than declared: the descriptor knows the field
+  // is a string, only the realm knows which strings are legal.
+  useFetch(
+    () => adminClient.components.find({ type: KEY_COMPONENT_TYPE }),
+    (found) => setKeys(found.filter((c) => c.providerId === KEY_PROVIDER_ID)),
+    // The realm is a dependency: keys belong to one, and a stale list would offer a key the realm
+    // on screen does not have.
+    [realm],
+  );
+
+  const keyRef = useWatch({ control, name: `config.${SIGNING_KEY_REF}` as const });
+
+  // What the chosen certificate actually says, computed by the server. The client_id below is the
+  // one field on this page nobody can check by eye, and deriving it here instead would be a second
+  // implementation of a value the request object already produces.
+  useFetch(
+    async () => {
+      if (mode !== "edit" || !aliasParam || !keyRef) return undefined;
+      // Plain fetch: this client exposes one resource object per stock endpoint and no generic
+      // call, and adding a resource to it would mean patching the package.
+      const response = await fetch(
+        `${adminClient.baseUrl}/admin/realms/${realm}`
+          + `/oid4vp/providers/${aliasParam}/signing-certificate`,
+        { headers: { Authorization: `Bearer ${await adminClient.getAccessToken()}` } },
+      );
+      if (response.status === 404) return "none" as const;
+      if (!response.ok) return "broken" as const;
+      return (await response.json()) as CertificateSummary;
+    },
+    (summary) => setCertificate(summary),
+    [realm, mode, aliasParam, keyRef],
   );
 
   const issuing = useWatch({ control, name: ISSUANCE_SWITCH });
@@ -329,8 +385,27 @@ export const Oid4vpSettings = ({ mode }: { mode: "add" | "edit" }) => {
                 isRequired={
                   property.name === "ownIssuerAnchorsPem" ? !!issuing : undefined
                 }
+                // A free-text component id is a value nobody can type correctly. The realm knows
+                // the answers; the descriptor cannot.
+                render={
+                  property.name === SIGNING_KEY_REF
+                    ? (common) => (
+                        <SelectControl
+                          {...common}
+                          options={keys.map((key) => ({
+                            key: key.id!,
+                            value: key.name ?? key.id!,
+                          }))}
+                          controller={{ defaultValue: "", rules: common.rules }}
+                        />
+                      )
+                    : undefined
+                }
               />
             ))}
+          {rows.some((property) => property.name === SIGNING_KEY_REF) && (
+            <CertificatePanel keys={keys} summary={certificate} />
+          )}
           {index === groups.length - 1 && buttons}
         </>,
       ),

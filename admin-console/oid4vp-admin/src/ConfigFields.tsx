@@ -1,22 +1,10 @@
 import type { ConfigPropertyRepresentation } from "@keycloak/keycloak-admin-client/lib/defs/authenticatorConfigInfoRepresentation";
 import {
-  FormErrorText,
-  HelpItem,
   SelectControl,
   SwitchControl,
   TextAreaControl,
   TextControl,
 } from "@keycloak/keycloak-ui-shared";
-import {
-  Button,
-  FormGroup,
-  InputGroup,
-  InputGroupItem,
-  TextArea,
-} from "@patternfly/react-core";
-import { EyeIcon, EyeSlashIcon } from "@patternfly/react-icons";
-import { useState } from "react";
-import { useController } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -40,9 +28,6 @@ import { useTranslation } from "react-i18next";
  *   <li>An unrecognised type is logged to the console and dropped upstream. Silently losing a field
  *       the server declares is the defect this whole page exists to avoid, so it is shown instead,
  *       read-only and named.</li>
- *   <li>A property the server marks {@code secret} is masked until asked for. Upstream honours that
- *       flag only through the {@code Password} type, which is a single-line input — and an input
- *       cannot hold a PEM: pasting a multi-line key into one joins its lines and corrupts it.</li>
  * </ul>
  */
 
@@ -56,100 +41,25 @@ export const configPath = (name: string) => `config.${name}`;
  */
 const MONOSPACE = { fontFamily: "var(--pf-v5-global--FontFamily--monospace)" };
 
-/**
- * A text area whose content is not on screen, and not in the page, until it is asked for.
- *
- * <p>Hidden is the default, and hidden means absent: what renders is a stand-in built from the line
- * count, never the value. That is stronger than the console's own {@code PasswordInput}, whose
- * {@code type="password"} still carries the secret in the DOM — a difference forced by the shape of
- * the data rather than chosen, since no masked text area exists to copy. The eye, its icons, its
- * variant and its label are the ones {@code PasswordInput} uses.</p>
- *
- * <p>What this does NOT do: keep the key away from the browser. The server sends it —
- * {@code StripSecretsUtils.stripBroker} masks {@code clientSecret} and {@code authTokenClientSecret}
- * by name, and takes no session, so it cannot consult a provider's declared properties. This hides
- * the key from the screen and from anything reading the page; it is not a substitute for the key
- * living somewhere the console never reads.</p>
- */
-const SecretTextAreaControl = ({
-  name,
-  label,
-  labelIcon,
-  rules,
-}: {
-  name: string;
-  label: string;
-  labelIcon?: string;
-  rules: { required?: string };
-}) => {
-  const { t } = useTranslation();
-  const [revealed, setRevealed] = useState(false);
-  const { field, fieldState } = useController({ name, rules, defaultValue: "" });
-
-  const value = (field.value as string) ?? "";
-  const lines = Math.min(Math.max(value.split("\n").length, 1), 12);
-  const mask = value
-    ? Array.from({ length: lines }, () => "•".repeat(44)).join("\n")
-    : "";
-
-  // The label is built here rather than by TextAreaControl: that control brings its own FormGroup,
-  // and nesting one inside an InputGroup would put the label beside the eye instead of above it.
-  return (
-    <FormGroup
-      label={label}
-      fieldId={name}
-      isRequired={!!rules.required}
-      labelIcon={
-        labelIcon ? <HelpItem helpText={labelIcon} fieldLabelId={name} /> : undefined
-      }
-    >
-      <InputGroup>
-        <InputGroupItem isFill>
-          {revealed ? (
-            <TextArea
-              {...field}
-              id={name}
-              data-testid={name}
-              rows={10}
-              style={MONOSPACE}
-              aria-label={label}
-            />
-          ) : (
-            // Bound to nothing: the stand-in cannot become the stored value, whatever is done to
-            // it, and the value itself never reaches the document.
-            <TextArea
-              id={name}
-              data-testid={`${name}-masked`}
-              rows={10}
-              style={MONOSPACE}
-              value={mask}
-              readOnlyVariant="default"
-              onChange={() => {}}
-              aria-label={label}
-            />
-          )}
-        </InputGroupItem>
-        <Button
-          variant="control"
-          aria-label={t("showPassword")}
-          data-testid={`${name}-reveal`}
-          onClick={() => setRevealed(!revealed)}
-        >
-          {revealed ? <EyeSlashIcon /> : <EyeIcon />}
-        </Button>
-      </InputGroup>
-      {fieldState.error && <FormErrorText message={fieldState.error.message!} />}
-    </FormGroup>
-  );
-};
-
 export const ConfigField = ({
   property,
   isRequired,
+  render,
 }: {
   property: ConfigPropertyRepresentation;
   /** Overrides the server's flag for a rule the server states across two fields, not on one. */
   isRequired?: boolean;
+  /**
+   * Rendered instead of the type's default control, for a field whose values this page can
+   * enumerate and the descriptor cannot. It receives the label, help text and required marker the
+   * server declares, so an override changes the control and never what the field says it is.
+   */
+  render?: (common: {
+    name: string;
+    label: string;
+    labelIcon?: string;
+    rules: { required?: string };
+  }) => JSX.Element;
 }) => {
   const { t, i18n } = useTranslation();
   const name = property.name!;
@@ -182,18 +92,13 @@ export const ConfigField = ({
     ...(property.defaultValue != null ? { defaultValue: property.defaultValue } : {}),
   };
 
+  if (render) {
+    return render({ name: configPath(name), label, labelIcon, rules });
+  }
+
   switch (property.type) {
     case "Text":
-      return property.secret ? (
-        <SecretTextAreaControl
-          name={configPath(name)}
-          label={label}
-          labelIcon={labelIcon}
-          rules={rules}
-        />
-      ) : (
-        <TextAreaControl {...common} rules={rules} rows={10} style={MONOSPACE} />
-      );
+      return <TextAreaControl {...common} rules={rules} rows={10} style={MONOSPACE} />;
 
     case "List":
       return (
