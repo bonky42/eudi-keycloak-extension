@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * SPI factory for the OID4VP identity-brokering provider. Declares the six admin-console
- * config fields whose keys ({@code trustAnchorsPem}, {@code signingKeyPem}, {@code signingCertPem},
+ * config fields whose keys ({@code trustAnchorsPem}, {@code signingKeyRef},
  * {@code dcqlQueryJson}, {@code matchingClaim}, {@code ttlSeconds}) are read back by
  * {@link Oid4vpConfig} — reusing its constants here so the two can never drift apart.
  *
@@ -61,20 +61,13 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
             new ProviderConfigProperty(
                 Oid4vpConfig.SIGNING_KEY_REF,
                 "Signing Key (realm key)",
-                "The id of a realm key component of type oid4vp-verifier-key. When set, the key and "
-                    + "certificate come from Realm settings \u2192 Keys and the two PEM fields below are "
-                    + "ignored \u2014 which is where they belong: a key held here is readable by anyone "
-                    + "who can read this provider.",
+                "The id of a realm key component of type oid4vp-verifier-key. The key and its "
+                    + "certificate live there rather than here: a value held in this provider's "
+                    + "configuration is served verbatim by the administration API and written "
+                    + "verbatim into the admin event log.",
                 ProviderConfigProperty.STRING_TYPE,
                 null),
-            signingKeyProperty(),
-            new ProviderConfigProperty(
-                Oid4vpConfig.SIGNING_CERT_PEM,
-                "Signing Certificate (PEM)",
-                "PEM-encoded X.509 certificate matching the signing key, presented via x5c.",
-                ProviderConfigProperty.TEXT_TYPE,
-                null),
-            new ProviderConfigProperty(
+new ProviderConfigProperty(
                 Oid4vpConfig.DCQL_QUERY_JSON,
                 "DCQL Query (JSON)",
                 "Digital Credentials Query Language document describing the requested presentation.",
@@ -164,28 +157,6 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
             .forEach(property -> property.setRequired(true));
 
         return properties;
-    }
-
-    /**
-     * The only field here that must not be read back by anyone who can open the console.
-     *
-     * <p>{@code setSecret} is what Keycloak offers to say so, and what it buys has to be stated
-     * plainly: for a COMPONENT the server replaces a secret value with asterisks on its way out,
-     * but a broker goes through {@code StripSecretsUtils.stripBroker}, which takes no session and
-     * therefore cannot look a provider's declared properties up — it masks {@code clientSecret} and
-     * {@code authTokenClientSecret} by name and nothing else. So this flag does NOT keep the key on
-     * the server; it travels to the console as part of the descriptor, and the OID4VP settings page
-     * uses it to keep the key off the screen until it is asked for.</p>
-     */
-    private static ProviderConfigProperty signingKeyProperty() {
-        ProviderConfigProperty property = new ProviderConfigProperty(
-            Oid4vpConfig.SIGNING_KEY_PEM,
-            "Signing Key (PEM)",
-            "PEM-encoded PKCS#8 EC private key used to sign the authorization request.",
-            ProviderConfigProperty.TEXT_TYPE,
-            null);
-        property.setSecret(true);
-        return property;
     }
 
     private static ProviderConfigProperty subjectPolicyProperty() {

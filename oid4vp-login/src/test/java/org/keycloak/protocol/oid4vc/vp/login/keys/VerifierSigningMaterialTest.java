@@ -33,11 +33,9 @@ class VerifierSigningMaterialTest {
         return "-----BEGIN " + type + "-----\n" + base64 + "\n-----END " + type + "-----\n";
     }
 
-    /** The legacy shape: the pair pasted into the identity provider's own configuration. */
-    private static Map<String, String> pemConfig() throws Exception {
+    private static Map<String, String> namingKey(String componentId) {
         Map<String, String> config = new HashMap<>();
-        config.put(Oid4vpConfig.SIGNING_KEY_PEM, toPem("PRIVATE KEY", chain.issuerKeyPair.getPrivate().getEncoded()));
-        config.put(Oid4vpConfig.SIGNING_CERT_PEM, toPem("CERTIFICATE", chain.issuerCert.getEncoded()));
+        config.put(Oid4vpConfig.SIGNING_KEY_REF, componentId);
         return config;
     }
 
@@ -64,35 +62,35 @@ class VerifierSigningMaterialTest {
         return Stream.empty();
     }
 
+    /**
+     * There is one home now. A provider naming no key has nothing to sign with, and saying so is
+     * better than the alternative this used to have: falling back to a pasted pair that the
+     * administration API served to anyone who could read the provider.
+     */
     @Test
-    void withoutAReferenceItReadsThePairPastedIntoTheProvider() throws Exception {
-        VerifierSigningMaterial material = VerifierSigningMaterial.resolve(
-            new Oid4vpConfig(pemConfig()), VerifierSigningMaterialTest::emptyRealm);
+    void aProviderNamingNoKeyHasNothingToSignWith() {
+        IllegalArgumentException refusal = assertThrows(IllegalArgumentException.class,
+            () -> VerifierSigningMaterial.resolve(
+                new Oid4vpConfig(new HashMap<>()), VerifierSigningMaterialTest::emptyRealm));
 
-        assertEquals(chain.issuerCert, material.certificate());
-        assertEquals(chain.issuerKeyPair.getPrivate(), material.keyPair().getPrivate());
+        assertTrue(refusal.getMessage().contains("Signing Key"), refusal.getMessage());
     }
 
     @Test
-    void aBlankReferenceCountsAsNoReference() throws Exception {
-        Map<String, String> config = pemConfig();
+    void aBlankReferenceIsNoReference() {
+        Map<String, String> config = new HashMap<>();
         config.put(Oid4vpConfig.SIGNING_KEY_REF, "   ");
 
-        VerifierSigningMaterial material = VerifierSigningMaterial.resolve(
-            new Oid4vpConfig(config), VerifierSigningMaterialTest::emptyRealm);
-
-        assertEquals(chain.issuerCert, material.certificate());
+        assertThrows(IllegalArgumentException.class, () -> VerifierSigningMaterial.resolve(
+            new Oid4vpConfig(config), VerifierSigningMaterialTest::emptyRealm));
     }
 
     /**
-     * The point of the whole exercise: named a key, it takes the key, and the PEM fields are not
-     * consulted at all — here they name a different certificate entirely, and the referenced one
-     * wins.
+     * The point of the whole exercise: named a key, the provider signs with it.
      */
     @Test
-    void aReferenceNamesAKeyInTheRealmAndThatKeyWins() throws Exception {
-        Map<String, String> config = pemConfig();
-        config.put(Oid4vpConfig.SIGNING_KEY_REF, COMPONENT_ID);
+    void aReferenceNamesAKeyInTheRealm() throws Exception {
+        Map<String, String> config = namingKey(COMPONENT_ID);
 
         VerifierSigningMaterial material = VerifierSigningMaterial.resolve(
             new Oid4vpConfig(config),
@@ -104,21 +102,17 @@ class VerifierSigningMaterialTest {
                 }
             });
 
-        assertEquals(chain.cardIssuerCert, material.certificate(),
-            "the referenced key must win over the pasted pair");
+        assertEquals(chain.cardIssuerCert, material.certificate());
         assertEquals(chain.cardIssuerKeyPair.getPrivate(), material.keyPair().getPrivate());
     }
 
     /**
      * A reference to a key that is gone is worth naming loudly. It happens for one ordinary reason:
-     * someone deleted the key component and left the provider pointing at it — and the alternative,
-     * falling back to whatever PEM is lying around, would sign requests with an identity nobody
-     * chose.
+     * someone deleted the key component and left the provider pointing at it.
      */
     @Test
     void aReferenceToAKeyThatIsNotThereIsRefused() throws Exception {
-        Map<String, String> config = pemConfig();
-        config.put(Oid4vpConfig.SIGNING_KEY_REF, "deleted-component");
+        Map<String, String> config = namingKey("deleted-component");
 
         IllegalArgumentException refusal = assertThrows(IllegalArgumentException.class,
             () -> VerifierSigningMaterial.resolve(new Oid4vpConfig(config),
@@ -130,8 +124,7 @@ class VerifierSigningMaterialTest {
 
     @Test
     void keysBelongingToAnotherComponentAreIgnored() throws Exception {
-        Map<String, String> config = pemConfig();
-        config.put(Oid4vpConfig.SIGNING_KEY_REF, "the-one-we-want");
+        Map<String, String> config = namingKey("the-one-we-want");
 
         assertThrows(IllegalArgumentException.class,
             () -> VerifierSigningMaterial.resolve(new Oid4vpConfig(config),
@@ -151,8 +144,7 @@ class VerifierSigningMaterialTest {
      */
     @Test
     void aReferencedKeyWithoutACertificateIsRefused() throws Exception {
-        Map<String, String> config = pemConfig();
-        config.put(Oid4vpConfig.SIGNING_KEY_REF, COMPONENT_ID);
+        Map<String, String> config = namingKey(COMPONENT_ID);
 
         KeyWrapper certificateless = new KeyWrapper();
         certificateless.setProviderId(COMPONENT_ID);
@@ -167,8 +159,7 @@ class VerifierSigningMaterialTest {
 
     @Test
     void thePublicHalfComesFromTheCertificateSoTheTwoCannotDisagree() throws Exception {
-        Map<String, String> config = pemConfig();
-        config.put(Oid4vpConfig.SIGNING_KEY_REF, COMPONENT_ID);
+        Map<String, String> config = namingKey(COMPONENT_ID);
 
         VerifierSigningMaterial material = VerifierSigningMaterial.resolve(
             new Oid4vpConfig(config),

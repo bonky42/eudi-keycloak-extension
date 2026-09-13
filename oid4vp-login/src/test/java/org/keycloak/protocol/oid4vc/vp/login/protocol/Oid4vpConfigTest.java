@@ -36,8 +36,7 @@ class Oid4vpConfigTest {
     private static Map<String, String> buildConfig(TestTrustChain chain) throws Exception {
         Map<String, String> config = new HashMap<>();
         config.put(Oid4vpConfig.TRUST_ANCHORS_PEM, toPem("CERTIFICATE", chain.caCert.getEncoded()));
-        config.put(Oid4vpConfig.SIGNING_KEY_PEM, toPem("PRIVATE KEY", chain.issuerKeyPair.getPrivate().getEncoded()));
-        config.put(Oid4vpConfig.SIGNING_CERT_PEM, toPem("CERTIFICATE", chain.issuerCert.getEncoded()));
+        config.put(Oid4vpConfig.SIGNING_KEY_REF, "a-key-component");
         config.put(Oid4vpConfig.DCQL_QUERY_JSON, PID_QUERY);
         config.put(Oid4vpConfig.MATCHING_CLAIM, "email");
         return config;
@@ -54,9 +53,8 @@ class Oid4vpConfigTest {
         Certificate validated = cfg.trustStore().validateChain(List.of(chain.issuerCert));
         assertEquals(chain.caCert, validated);
 
-        // signing key material
-        assertNotNull(cfg.signingKey().getPrivate());
-        assertEquals(chain.issuerCert, cfg.signingCert());
+        // the signing material is named, not carried; resolving it is VerifierSigningMaterial's job
+        assertEquals("a-key-component", cfg.signingKeyRef());
 
         // DCQL query
         assertEquals("pid", cfg.dcqlQuery().getCredentials().get(0).getId());

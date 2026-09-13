@@ -2,6 +2,11 @@ package org.keycloak.protocol.oid4vc.vp.login.admin;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.keycloak.common.util.MultivaluedHashMap;
+import org.keycloak.component.ComponentModel;
+import org.keycloak.crypto.KeyWrapper;
+import org.keycloak.protocol.oid4vc.vp.login.keys.Oid4vpVerifierKeyProvider;
+import org.keycloak.protocol.oid4vc.vp.login.keys.Oid4vpVerifierKeyProviderFactory;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
 import org.keycloak.protocol.oid4vc.vp.request.CertificateSummary;
 import org.keycloak.protocol.oid4vc.vp.request.VerifierClientId;
@@ -30,15 +35,40 @@ class SigningCertificateResourceTest {
         return "-----BEGIN " + type + "-----\n" + base64 + "\n-----END " + type + "-----\n";
     }
 
-    private static Map<String, String> configWithCertificate() throws Exception {
+    private static final String COMPONENT_ID = "a-key-component";
+
+    private static Map<String, String> namingTheKey() {
         Map<String, String> config = new HashMap<>();
-        config.put(Oid4vpConfig.SIGNING_CERT_PEM, toPem("CERTIFICATE", chain.issuerCert.getEncoded()));
+        config.put(Oid4vpConfig.SIGNING_KEY_REF, COMPONENT_ID);
         return config;
     }
 
+    /** The realm as it really holds the key: the real provider, from real material. */
+    private static java.util.stream.Stream<KeyWrapper> realmHoldingTheKey() {
+        try {
+            MultivaluedHashMap<String, String> config = new MultivaluedHashMap<>();
+            config.putSingle(Oid4vpVerifierKeyProviderFactory.PRIVATE_KEY_PEM,
+                toPem("PRIVATE KEY", chain.issuerKeyPair.getPrivate().getEncoded()));
+            config.putSingle(Oid4vpVerifierKeyProviderFactory.CERTIFICATE_PEM,
+                toPem("CERTIFICATE", chain.issuerCert.getEncoded()));
+            ComponentModel model = new ComponentModel();
+            model.setId(COMPONENT_ID);
+            model.setProviderId(Oid4vpVerifierKeyProviderFactory.ID);
+            model.setConfig(config);
+            return new Oid4vpVerifierKeyProvider(model).getKeysStream();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static java.util.stream.Stream<KeyWrapper> emptyRealm() {
+        return java.util.stream.Stream.empty();
+    }
+
     @Test
-    void itSummarisesTheCertificateTheProviderIsConfiguredWith() throws Exception {
-        CertificateSummary summary = SigningCertificateResource.summarise(configWithCertificate())
+    void itSummarisesTheCertificateOfTheKeyTheProviderNames() throws Exception {
+        CertificateSummary summary = SigningCertificateResource
+            .summarise(namingTheKey(), SigningCertificateResourceTest::realmHoldingTheKey)
             .orElseThrow();
 
         assertEquals(chain.issuerCert.getSubjectX500Principal().getName(), summary.subject());
@@ -47,34 +77,39 @@ class SigningCertificateResourceTest {
     }
 
     /**
-     * A provider with no certificate yet is a form being filled in, not a fault. Empty is the
-     * answer, which the endpoint turns into a 404 — "nothing to show here" — and which lets a
-     * console render an empty panel rather than an alert.
+     * A provider naming no key yet is a form being filled in, not a fault. Empty is the answer,
+     * which the endpoint turns into a 404 — "nothing to show here" — and which lets a console render
+     * an empty panel rather than an alert.
+     *
+     * <p>This state was unreachable until the PEM fields went away: phase 1 made them mandatory, so
+     * a provider without signing material could not be saved at all.</p>
      */
     @Test
-    void aProviderWithoutACertificateHasNothingToSummarise() {
-        assertEquals(Optional.empty(), SigningCertificateResource.summarise(Map.of()));
+    void aProviderNamingNoKeyHasNothingToSummarise() {
+        assertEquals(Optional.empty(),
+            SigningCertificateResource.summarise(Map.of(), SigningCertificateResourceTest::emptyRealm));
     }
 
     @Test
-    void aBlankCertificateCountsAsAbsent() {
-        assertEquals(Optional.empty(),
-            SigningCertificateResource.summarise(Map.of(Oid4vpConfig.SIGNING_CERT_PEM, "   ")));
+    void aBlankReferenceCountsAsAbsent() {
+        assertEquals(Optional.empty(), SigningCertificateResource.summarise(
+            Map.of(Oid4vpConfig.SIGNING_KEY_REF, "   "), SigningCertificateResourceTest::emptyRealm));
     }
 
     @Test
     void aNullConfigurationCountsAsAbsent() {
-        assertEquals(Optional.empty(), SigningCertificateResource.summarise(null));
+        assertEquals(Optional.empty(),
+            SigningCertificateResource.summarise(null, SigningCertificateResourceTest::emptyRealm));
     }
 
     /**
-     * Unreadable is not absent, and the difference is the whole value of this endpoint: a mistyped
-     * certificate must say so here rather than surface later as a wallet refusing the request for
-     * reasons that name none of it.
+     * A dangling reference is not absence, and the difference is the whole value of this endpoint:
+     * it must say so here rather than surface later as a wallet refusing the request for reasons
+     * that name none of it.
      */
     @Test
-    void anUnreadableCertificateIsNotTreatedAsAbsent() {
+    void aReferenceToAKeyThatIsGoneIsNotTreatedAsAbsent() {
         assertThrows(IllegalArgumentException.class, () -> SigningCertificateResource.summarise(
-            Map.of(Oid4vpConfig.SIGNING_CERT_PEM, "this is not a PEM block")));
+            namingTheKey(), SigningCertificateResourceTest::emptyRealm));
     }
 }

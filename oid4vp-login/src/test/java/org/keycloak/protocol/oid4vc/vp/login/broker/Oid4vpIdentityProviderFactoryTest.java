@@ -25,8 +25,6 @@ class Oid4vpIdentityProviderFactoryTest {
     private static final Set<String> EXPECTED_CONFIG_NAMES = Set.of(
         Oid4vpConfig.SIGNING_KEY_REF,
         Oid4vpConfig.TRUST_ANCHORS_PEM,
-        Oid4vpConfig.SIGNING_KEY_PEM,
-        Oid4vpConfig.SIGNING_CERT_PEM,
         Oid4vpConfig.DCQL_QUERY_JSON,
         Oid4vpConfig.MATCHING_CLAIM,
         Oid4vpConfig.TTL_SECONDS,
