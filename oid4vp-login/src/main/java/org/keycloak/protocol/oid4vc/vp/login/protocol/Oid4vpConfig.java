@@ -25,6 +25,7 @@ public final class Oid4vpConfig {
 
     public static final String TRUST_ANCHORS_PEM = "trustAnchorsPem";
     public static final String OWN_ISSUER_ANCHORS_PEM = "ownIssuerAnchorsPem";
+    public static final String SIGNING_KEY_REF = "signingKeyRef";
     public static final String SIGNING_KEY_PEM = "signingKeyPem";
     public static final String SIGNING_CERT_PEM = "signingCertPem";
     public static final String DCQL_QUERY_JSON = "dcqlQueryJson";
@@ -102,6 +103,12 @@ public final class Oid4vpConfig {
         } catch (GeneralSecurityException e) {
             throw new IllegalArgumentException("Invalid " + TRUST_ANCHORS_PEM, e);
         }
+    }
+
+    /** The realm key component this provider signs with, or {@code null} when none is named. */
+    public String signingKeyRef() {
+        String raw = config.get(SIGNING_KEY_REF);
+        return (raw == null || raw.isBlank()) ? null : raw.trim();
     }
 
     public KeyPair signingKey() {

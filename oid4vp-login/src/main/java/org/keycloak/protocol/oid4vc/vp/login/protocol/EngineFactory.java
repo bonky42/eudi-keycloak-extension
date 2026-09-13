@@ -3,6 +3,7 @@ package org.keycloak.protocol.oid4vc.vp.login.protocol;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.SingleUseObjectProvider;
 import org.keycloak.protocol.oid4vc.vp.engine.PresentationEngine;
+import org.keycloak.protocol.oid4vc.vp.login.keys.VerifierSigningMaterial;
 import org.keycloak.protocol.oid4vc.vp.request.RequestObjectBuilder;
 import org.keycloak.protocol.oid4vc.vp.store.SingleUseTransactionStore;
 import org.keycloak.protocol.oid4vc.vp.trust.OwnVctIssuerAuthorization;
@@ -31,10 +32,12 @@ public final class EngineFactory {
      *                        {@link SingleUseObjectProvider} and the SPI-registered
      *                        {@code VpVerifierFactory} instances
      * @param config          typed reading of the OID4VP identity provider's configuration
+     * @param signing         the key and certificate to sign Request Objects with, already resolved
      * @param clientId        the verifier's identifier (the Request Object's {@code client_id})
      * @param responseUriBase where the {@code vp_token} is posted back ({@code response_uri})
      */
     public static PresentationEngine build(KeycloakSession session, Oid4vpConfig config,
+                                            VerifierSigningMaterial signing,
                                             String clientId, String responseUriBase) {
         SingleUseTransactionStore store = new SingleUseTransactionStore(
             session.getProvider(SingleUseObjectProvider.class));
@@ -47,7 +50,7 @@ public final class EngineFactory {
             config.trustStore(),
             new OwnVctIssuerAuthorization(config.ownVct(), config.ownIssuerAnchors()));
         RequestObjectBuilder requestBuilder = new RequestObjectBuilder(
-            config.signingKey(), config.signingCert(), Clock.systemUTC());
+            signing.keyPair(), signing.certificate(), Clock.systemUTC());
 
         return new PresentationEngine(store, requestBuilder, verifiers, trustPolicy,
             clientId, responseUriBase, Clock.systemUTC());

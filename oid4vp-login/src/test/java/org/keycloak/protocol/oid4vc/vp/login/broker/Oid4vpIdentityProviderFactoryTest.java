@@ -23,6 +23,7 @@ class Oid4vpIdentityProviderFactoryTest {
         "META-INF/services/org.keycloak.broker.provider.IdentityProviderFactory";
 
     private static final Set<String> EXPECTED_CONFIG_NAMES = Set.of(
+        Oid4vpConfig.SIGNING_KEY_REF,
         Oid4vpConfig.TRUST_ANCHORS_PEM,
         Oid4vpConfig.SIGNING_KEY_PEM,
         Oid4vpConfig.SIGNING_CERT_PEM,

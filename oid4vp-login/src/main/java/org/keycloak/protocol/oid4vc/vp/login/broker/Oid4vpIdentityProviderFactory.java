@@ -58,6 +58,15 @@ public class Oid4vpIdentityProviderFactory extends AbstractIdentityProviderFacto
                 "PEM-encoded certificate(s) trusted as roots for issuer/credential validation.",
                 ProviderConfigProperty.TEXT_TYPE,
                 null),
+            new ProviderConfigProperty(
+                Oid4vpConfig.SIGNING_KEY_REF,
+                "Signing Key (realm key)",
+                "The id of a realm key component of type oid4vp-verifier-key. When set, the key and "
+                    + "certificate come from Realm settings \u2192 Keys and the two PEM fields below are "
+                    + "ignored \u2014 which is where they belong: a key held here is readable by anyone "
+                    + "who can read this provider.",
+                ProviderConfigProperty.STRING_TYPE,
+                null),
             signingKeyProperty(),
             new ProviderConfigProperty(
                 Oid4vpConfig.SIGNING_CERT_PEM,
