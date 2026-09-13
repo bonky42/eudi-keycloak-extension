@@ -521,7 +521,7 @@ class WalletLoginE2eIT {
         // the rule under test and not from a generally malformed request.
         String body = """
             {"alias":"oid4vp-incomplete","providerId":"oid4vp","enabled":true,
-             "config":{"signingKeyPem":"x","signingCertPem":"x","dcqlQueryJson":"{}"}}""";
+             "config":{"signingKeyRef":"a-key-component","dcqlQueryJson":"{}"}}""";
 
         HttpResponse<String> created = exchange(http,
             HttpRequest.newBuilder(URI.create(baseUrl + "/admin/realms/" + REALM + "/identity-provider/instances"))
@@ -540,11 +540,9 @@ class WalletLoginE2eIT {
     /**
      * The other half of the same wiring: a provider with nothing to sign its requests with.
      *
-     * <p>Unlike the required-field rule above, this one is a choice between two shapes — a realm key
-     * named, or the legacy pair pasted — so it lives in {@code validate} as a cross-field rule and
-     * not in {@code REQUIRED_FIELDS}. Its unit tests instantiate the config class directly and would
-     * stay green whether or not Keycloak ever reached it. Only a real server saving a real
-     * configuration shows that it is on the path.</p>
+     * <p>Its unit tests instantiate the config class directly and would stay green whether or not
+     * Keycloak ever reached them. Only a real server saving a real configuration shows that the
+     * rules are on the path — and this one guards the field that replaced the pasted key.</p>
      */
     @Test
     void theAdminApiRefusesAProviderWithNothingToSignWith() throws Exception {
@@ -567,8 +565,8 @@ class WalletLoginE2eIT {
 
         assertEquals(400, created.statusCode(),
             "a provider that cannot sign anything must be refused; body=" + snippet(created.body()));
-        assertTrue(created.body().contains("sign"),
-            "the refusal must say what is missing; body=" + snippet(created.body()));
+        assertTrue(created.body().contains("Signing Key (realm key)"),
+            "the refusal must name the field, as the form labels it; body=" + snippet(created.body()));
     }
 
     /**

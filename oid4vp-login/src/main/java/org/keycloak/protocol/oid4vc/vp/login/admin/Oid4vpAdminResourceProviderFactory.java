@@ -31,7 +31,8 @@ public class Oid4vpAdminResourceProviderFactory implements AdminRealmResourcePro
             @Override
             public Object getResource(KeycloakSession session, RealmModel realm,
                                       AdminPermissionEvaluator auth, AdminEventBuilder events) {
-                return new SigningCertificateResource(realm, auth, Clock.systemUTC());
+                return new SigningCertificateResource(
+                    realm, auth, () -> session.keys().getKeysStream(realm), Clock.systemUTC());
             }
 
             @Override

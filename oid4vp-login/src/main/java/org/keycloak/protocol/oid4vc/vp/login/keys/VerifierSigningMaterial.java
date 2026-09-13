@@ -14,10 +14,11 @@ import java.util.stream.Stream;
 /**
  * The key and certificate this verifier signs its Request Objects with, wherever they live.
  *
- * <p><b>Two homes, for now.</b> Named a realm key component, this reads that; named nothing, it
- * falls back to the PEM pair pasted into the identity provider's configuration. The fallback is
- * deliberate and temporary — it is what lets the reference be introduced without breaking a single
- * realm that already works. Removing it is its own change.
+ * <p><b>One home.</b> The key is a realm key component and the provider names it. It used to be
+ * allowed to carry the PEM pair itself, and that is exactly what had to end: a broker's
+ * configuration goes through {@code StripSecretsUtils.stripBroker}, whose whole body masks
+ * {@code clientSecret} and returns — so the private key was served verbatim by the administration
+ * API and written verbatim into {@code ADMIN_EVENT}.
  *
  * <p><b>Why a component id and not a kid.</b> A {@code kid} names one piece of material; replace the
  * key and it changes, and the provider would point at something gone. The component outlives its
@@ -47,7 +48,9 @@ public record VerifierSigningMaterial(KeyPair keyPair, X509Certificate certifica
                                                   Supplier<Stream<KeyWrapper>> realmKeys) {
         String ref = config.signingKeyRef();
         if (ref == null) {
-            return new VerifierSigningMaterial(config.signingKey(), config.signingCert());
+            throw new IllegalArgumentException(
+                "This provider names no 'Signing Key (realm key)': there is nothing to sign its "
+                    + "requests with");
         }
         return fromRealmKey(ref, realmKeys.get());
     }

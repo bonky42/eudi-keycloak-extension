@@ -12,6 +12,8 @@ import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.models.UserModel;
 import org.keycloak.protocol.oid4vc.vp.login.card.CardGrant;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.ClaimsToContext;
+import org.keycloak.protocol.oid4vc.vp.login.keys.Oid4vpVerifierKeyProvider;
+import org.keycloak.protocol.oid4vc.vp.login.keys.Oid4vpVerifierKeyProviderFactory;
 import org.keycloak.protocol.oid4vc.vp.login.keys.VerifierSigningMaterial;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.VerifiedClaimsNotes;
@@ -410,10 +412,8 @@ class Oid4vpIdentityProviderTest {
     @Test
     void theClientIdIsTheFingerprintOfTheConfiguredSigningCertificate() throws Exception {
         TestTrustChain chain = new TestTrustChain();
-        Map<String, String> raw = signingConfig(chain.issuerKeyPair, chain.issuerCert);
-        Oid4vpConfig cfg = new Oid4vpConfig(raw);
-
-        String clientId = Oid4vpIdentityProvider.clientId(signingMaterial(cfg));
+        String clientId = Oid4vpIdentityProvider.clientId(
+            signingMaterial(chain.issuerKeyPair, chain.issuerCert));
 
         assertEquals(VerifierClientId.x509Hash(chain.issuerCert), clientId);
         assertTrue(clientId.startsWith("x509_hash:"), "the x509_san_dns scheme no longer applies");
@@ -424,34 +424,35 @@ class Oid4vpIdentityProviderTest {
     @Test
     void adifferentSigningCertificateYieldsADifferentClientId() throws Exception {
         TestTrustChain chain = new TestTrustChain();
-        Map<String, String> mine = signingConfig(chain.issuerKeyPair, chain.issuerCert);
-        Map<String, String> other = signingConfig(chain.thirdPartyIssuerKeyPair, chain.thirdPartyIssuerCert);
-
-        assertNotEquals(Oid4vpIdentityProvider.clientId(signingMaterial(new Oid4vpConfig(mine))),
-            Oid4vpIdentityProvider.clientId(signingMaterial(new Oid4vpConfig(other))));
+        assertNotEquals(
+            Oid4vpIdentityProvider.clientId(signingMaterial(chain.issuerKeyPair, chain.issuerCert)),
+            Oid4vpIdentityProvider.clientId(
+                signingMaterial(chain.thirdPartyIssuerKeyPair, chain.thirdPartyIssuerCert)));
     }
 
     /**
-     * The signing pair as a provider really carries it. Phase 1 makes both fields mandatory, so a
-     * configuration holding a certificate and no key is one that cannot be saved.
+     * The material as the realm really holds it: built by the real key provider, resolved by the
+     * real resolver. Only the lookup is stood in for.
      */
-    private static Map<String, String> signingConfig(java.security.KeyPair pair,
-                                                     java.security.cert.X509Certificate cert)
+    private static VerifierSigningMaterial signingMaterial(java.security.KeyPair pair,
+                                                           java.security.cert.X509Certificate cert)
         throws Exception {
-        Map<String, String> raw = baseConfig();
-        raw.put(Oid4vpConfig.SIGNING_CERT_PEM, pem(cert.getEncoded()));
-        raw.put(Oid4vpConfig.SIGNING_KEY_PEM, "-----BEGIN PRIVATE KEY-----\n"
-            + Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(pair.getPrivate().getEncoded())
-            + "\n-----END PRIVATE KEY-----\n");
-        return raw;
-    }
+        org.keycloak.common.util.MultivaluedHashMap<String, String> keyConfig =
+            new org.keycloak.common.util.MultivaluedHashMap<>();
+        keyConfig.putSingle(Oid4vpVerifierKeyProviderFactory.PRIVATE_KEY_PEM,
+            "-----BEGIN PRIVATE KEY-----\n"
+                + Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(pair.getPrivate().getEncoded())
+                + "\n-----END PRIVATE KEY-----\n");
+        keyConfig.putSingle(Oid4vpVerifierKeyProviderFactory.CERTIFICATE_PEM, pem(cert.getEncoded()));
+        org.keycloak.component.ComponentModel model = new org.keycloak.component.ComponentModel();
+        model.setId("a-key-component");
+        model.setProviderId(Oid4vpVerifierKeyProviderFactory.ID);
+        model.setConfig(keyConfig);
 
-    /**
-     * Resolves through the real resolver with an empty realm, so these assertions also cover the
-     * fallback path: a provider naming no key component still signs with its pasted pair.
-     */
-    private static VerifierSigningMaterial signingMaterial(Oid4vpConfig cfg) {
-        return VerifierSigningMaterial.resolve(cfg, java.util.stream.Stream::of);
+        Map<String, String> raw = baseConfig();
+        raw.put(Oid4vpConfig.SIGNING_KEY_REF, "a-key-component");
+        return VerifierSigningMaterial.resolve(new Oid4vpConfig(raw),
+            () -> new Oid4vpVerifierKeyProvider(model).getKeysStream());
     }
 
     private static String pem(byte[] der) {

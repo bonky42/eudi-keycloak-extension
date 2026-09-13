@@ -71,8 +71,8 @@ const SECTIONS: { title: string; hint: string; fields: string[]; gated?: boolean
   {
     title: "Verifying presentations",
     hint: "Everything below is needed before a wallet can be asked for anything at all.",
-    fields: ["trustAnchorsPem", "signingKeyRef", "signingKeyPem", "signingCertPem",
-             "dcqlQueryJson", "ttlSeconds", "requestPurpose"],
+    fields: ["trustAnchorsPem", "signingKeyRef", "dcqlQueryJson", "ttlSeconds",
+             "requestPurpose"],
   },
   {
     title: "Identifying the holder",

@@ -7,19 +7,19 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import org.keycloak.crypto.KeyWrapper;
 import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.RealmModel;
+import org.keycloak.protocol.oid4vc.vp.login.keys.VerifierSigningMaterial;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
 import org.keycloak.protocol.oid4vc.vp.request.CertificateSummary;
 import org.keycloak.services.resources.admin.fgap.AdminPermissionEvaluator;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Tells an administrator what the certificate they pasted actually says.
@@ -47,11 +47,14 @@ public class SigningCertificateResource {
 
     private final RealmModel realm;
     private final AdminPermissionEvaluator auth;
+    private final Supplier<Stream<KeyWrapper>> realmKeys;
     private final Clock clock;
 
-    SigningCertificateResource(RealmModel realm, AdminPermissionEvaluator auth, Clock clock) {
+    SigningCertificateResource(RealmModel realm, AdminPermissionEvaluator auth,
+                               Supplier<Stream<KeyWrapper>> realmKeys, Clock clock) {
         this.realm = realm;
         this.auth = auth;
+        this.realmKeys = realmKeys;
         this.clock = clock;
     }
 
@@ -71,47 +74,38 @@ public class SigningCertificateResource {
             .orElseThrow(() -> new NotFoundException("No identity provider with alias " + alias));
 
         try {
-            return summarise(provider.getConfig(), clock)
+            return summarise(provider.getConfig(), realmKeys, clock)
                 .orElseThrow(() -> new NotFoundException(
-                    "This provider has no signing certificate configured"));
+                    "This provider names no signing key yet"));
         } catch (IllegalArgumentException e) {
-            // Unreadable is a mistake already made, not a field left empty: saying so here is what
-            // keeps it from surfacing later as a wallet refusing the request for reasons that name
-            // none of it.
+            // A reference that names a key which is gone, or a key that cannot sign for this
+            // provider. That is a mistake already made, not a field left empty: saying so here is
+            // what keeps it from surfacing later as a wallet refusing the request for reasons that
+            // name none of it.
             throw new BadRequestException(e.getMessage(), e);
         }
     }
 
-    static Optional<CertificateSummary> summarise(Map<String, String> config) {
-        return summarise(config, Clock.systemUTC());
+    static Optional<CertificateSummary> summarise(Map<String, String> config,
+                                                  Supplier<Stream<KeyWrapper>> realmKeys) {
+        return summarise(config, realmKeys, Clock.systemUTC());
     }
 
     /**
-     * @return empty when no certificate is configured — a form being filled in, not a fault
-     * @throws IllegalArgumentException when one is configured but cannot be read
+     * The certificate comes through the same resolver the request object uses, so this cannot
+     * describe one certificate while the wallet is shown another.
+     *
+     * @return empty when the provider names no key — a form being filled in, not a fault
+     * @throws IllegalArgumentException when it names one that cannot sign for it
      */
-    static Optional<CertificateSummary> summarise(Map<String, String> config, Clock clock) {
-        String pem = config == null ? null : config.get(Oid4vpConfig.SIGNING_CERT_PEM);
-        if (pem == null || pem.isBlank()) {
+    static Optional<CertificateSummary> summarise(Map<String, String> config,
+                                                  Supplier<Stream<KeyWrapper>> realmKeys,
+                                                  Clock clock) {
+        Oid4vpConfig typed = new Oid4vpConfig(config == null ? Map.of() : config);
+        if (typed.signingKeyRef() == null) {
             return Optional.empty();
         }
-        return Optional.of(CertificateSummary.of(parse(pem), clock.instant()));
-    }
-
-    private static X509Certificate parse(String pem) {
-        X509Certificate certificate;
-        try {
-            CertificateFactory factory = CertificateFactory.getInstance("X.509");
-            certificate = (X509Certificate) factory.generateCertificate(
-                new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new IllegalArgumentException("The signing certificate is not readable as PEM", e);
-        }
-        if (certificate == null) {
-            // generateCertificate answers null rather than throwing when the input holds no PEM
-            // block at all, which is exactly what a half-pasted field looks like.
-            throw new IllegalArgumentException("The signing certificate is not readable as PEM");
-        }
-        return certificate;
+        return Optional.of(CertificateSummary.of(
+            VerifierSigningMaterial.resolve(typed, realmKeys).certificate(), clock.instant()));
     }
 }

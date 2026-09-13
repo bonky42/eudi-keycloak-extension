@@ -4,15 +4,9 @@ import org.keycloak.protocol.oid4vc.vp.model.DcqlQuery;
 import org.jboss.logging.Logger;
 import org.keycloak.protocol.oid4vc.vp.trust.TrustStore;
 
-import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
-import java.security.KeyPair;
-import java.security.PrivateKey;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -26,8 +20,6 @@ public final class Oid4vpConfig {
     public static final String TRUST_ANCHORS_PEM = "trustAnchorsPem";
     public static final String OWN_ISSUER_ANCHORS_PEM = "ownIssuerAnchorsPem";
     public static final String SIGNING_KEY_REF = "signingKeyRef";
-    public static final String SIGNING_KEY_PEM = "signingKeyPem";
-    public static final String SIGNING_CERT_PEM = "signingCertPem";
     public static final String DCQL_QUERY_JSON = "dcqlQueryJson";
     public static final String MATCHING_CLAIM = "matchingClaim";
     public static final String TTL_SECONDS = "ttlSeconds";
@@ -109,15 +101,6 @@ public final class Oid4vpConfig {
     public String signingKeyRef() {
         String raw = config.get(SIGNING_KEY_REF);
         return (raw == null || raw.isBlank()) ? null : raw.trim();
-    }
-
-    public KeyPair signingKey() {
-        PrivateKey privateKey = parsePrivateKey(config.get(SIGNING_KEY_PEM));
-        return new KeyPair(signingCert().getPublicKey(), privateKey);
-    }
-
-    public X509Certificate signingCert() {
-        return parseCertificate(config.get(SIGNING_CERT_PEM));
     }
 
     public DcqlQuery dcqlQuery() {
@@ -209,29 +192,5 @@ public final class Oid4vpConfig {
     public String subjectClaimByVct() {
         String raw = config.get(SUBJECT_CLAIM_BY_VCT);
         return (raw == null || raw.isBlank()) ? null : raw.trim();
-    }
-
-    private static X509Certificate parseCertificate(String pem) {
-        try {
-            CertificateFactory factory = CertificateFactory.getInstance("X.509");
-            return (X509Certificate) factory.generateCertificate(
-                new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
-        } catch (GeneralSecurityException e) {
-            throw new IllegalArgumentException("Invalid PEM certificate", e);
-        }
-    }
-
-    private static PrivateKey parsePrivateKey(String pem) {
-        try {
-            String base64 = pem
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s", "");
-            byte[] der = Base64.getDecoder().decode(base64);
-            KeyFactory factory = KeyFactory.getInstance("EC");
-            return factory.generatePrivate(new PKCS8EncodedKeySpec(der));
-        } catch (GeneralSecurityException e) {
-            throw new IllegalArgumentException("Invalid PEM private key", e);
-        }
     }
 }
