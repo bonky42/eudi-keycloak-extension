@@ -42,6 +42,7 @@ import org.keycloak.protocol.oid4vc.vp.login.identity.IdentityResolver;
 import org.keycloak.protocol.oid4vc.vp.login.identity.ResolvedIdentity;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.ClaimsToContext;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.EngineFactory;
+import org.keycloak.protocol.oid4vc.vp.login.keys.VerifierSigningMaterial;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.RequestedClaims;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.PresentationNote;
@@ -130,10 +131,11 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
         Oid4vpConfig cfg = new Oid4vpConfig(getConfig().getConfig());
 
         URI baseUri = request.getUriInfo().getBaseUri();
-        String clientId = clientId(cfg);
+        VerifierSigningMaterial signing = VerifierSigningMaterial.resolve(requestSession, realm, cfg);
+        String clientId = clientId(signing);
         String responseUriBase = responseUriBase(baseUri, realm);
 
-        PresentationEngine engine = EngineFactory.build(requestSession, cfg, clientId, responseUriBase);
+        PresentationEngine engine = EngineFactory.build(requestSession, cfg, signing, clientId, responseUriBase);
         PresentationTransaction tx = engine.createTransaction(cfg.dcqlQuery(), cfg.ttlSeconds());
 
         String encodedState = request.getState().getEncoded();
@@ -477,7 +479,9 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
     public Object callback(RealmModel realm, AuthenticationCallback callback, EventBuilder event) {
         URI baseUri = session.getContext().getUri().getBaseUri();
         Oid4vpConfig cfg = new Oid4vpConfig(getConfig().getConfig());
-        PresentationEngine engine = EngineFactory.build(session, cfg, clientId(cfg), responseUriBase(baseUri, realm));
+        VerifierSigningMaterial signing = VerifierSigningMaterial.resolve(session, realm, cfg);
+        PresentationEngine engine = EngineFactory.build(
+            session, cfg, signing, clientId(signing), responseUriBase(baseUri, realm));
         Oid4vpEndpoints endpoints = new Oid4vpEndpoints(session, engine);
         return new CallbackEndpoint(this, callback, getConfig(), cfg, engine, endpoints);
     }
@@ -508,8 +512,8 @@ public class Oid4vpIdentityProvider extends AbstractIdentityProvider<IdentityPro
      * from the certificate itself also makes the identifier and its proof ({@code x5c}) come from
      * one source, where two separate sources could drift apart.
      */
-    static String clientId(Oid4vpConfig cfg) {
-        return VerifierClientId.x509Hash(cfg.signingCert());
+    static String clientId(VerifierSigningMaterial signing) {
+        return VerifierClientId.x509Hash(signing.certificate());
     }
 
     private String responseUriBase(URI baseUri, RealmModel realm) {

@@ -12,6 +12,7 @@ import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.models.UserModel;
 import org.keycloak.protocol.oid4vc.vp.login.card.CardGrant;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.ClaimsToContext;
+import org.keycloak.protocol.oid4vc.vp.login.keys.VerifierSigningMaterial;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
 import org.keycloak.protocol.oid4vc.vp.login.protocol.VerifiedClaimsNotes;
 import org.keycloak.protocol.oid4vc.vp.request.VerifierClientId;
@@ -409,11 +410,10 @@ class Oid4vpIdentityProviderTest {
     @Test
     void theClientIdIsTheFingerprintOfTheConfiguredSigningCertificate() throws Exception {
         TestTrustChain chain = new TestTrustChain();
-        Map<String, String> raw = baseConfig();
-        raw.put(Oid4vpConfig.SIGNING_CERT_PEM, pem(chain.issuerCert.getEncoded()));
+        Map<String, String> raw = signingConfig(chain.issuerKeyPair, chain.issuerCert);
         Oid4vpConfig cfg = new Oid4vpConfig(raw);
 
-        String clientId = Oid4vpIdentityProvider.clientId(cfg);
+        String clientId = Oid4vpIdentityProvider.clientId(signingMaterial(cfg));
 
         assertEquals(VerifierClientId.x509Hash(chain.issuerCert), clientId);
         assertTrue(clientId.startsWith("x509_hash:"), "the x509_san_dns scheme no longer applies");
@@ -424,13 +424,34 @@ class Oid4vpIdentityProviderTest {
     @Test
     void adifferentSigningCertificateYieldsADifferentClientId() throws Exception {
         TestTrustChain chain = new TestTrustChain();
-        Map<String, String> mine = baseConfig();
-        mine.put(Oid4vpConfig.SIGNING_CERT_PEM, pem(chain.issuerCert.getEncoded()));
-        Map<String, String> other = baseConfig();
-        other.put(Oid4vpConfig.SIGNING_CERT_PEM, pem(chain.thirdPartyIssuerCert.getEncoded()));
+        Map<String, String> mine = signingConfig(chain.issuerKeyPair, chain.issuerCert);
+        Map<String, String> other = signingConfig(chain.thirdPartyIssuerKeyPair, chain.thirdPartyIssuerCert);
 
-        assertNotEquals(Oid4vpIdentityProvider.clientId(new Oid4vpConfig(mine)),
-            Oid4vpIdentityProvider.clientId(new Oid4vpConfig(other)));
+        assertNotEquals(Oid4vpIdentityProvider.clientId(signingMaterial(new Oid4vpConfig(mine))),
+            Oid4vpIdentityProvider.clientId(signingMaterial(new Oid4vpConfig(other))));
+    }
+
+    /**
+     * The signing pair as a provider really carries it. Phase 1 makes both fields mandatory, so a
+     * configuration holding a certificate and no key is one that cannot be saved.
+     */
+    private static Map<String, String> signingConfig(java.security.KeyPair pair,
+                                                     java.security.cert.X509Certificate cert)
+        throws Exception {
+        Map<String, String> raw = baseConfig();
+        raw.put(Oid4vpConfig.SIGNING_CERT_PEM, pem(cert.getEncoded()));
+        raw.put(Oid4vpConfig.SIGNING_KEY_PEM, "-----BEGIN PRIVATE KEY-----\n"
+            + Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(pair.getPrivate().getEncoded())
+            + "\n-----END PRIVATE KEY-----\n");
+        return raw;
+    }
+
+    /**
+     * Resolves through the real resolver with an empty realm, so these assertions also cover the
+     * fallback path: a provider naming no key component still signs with its pasted pair.
+     */
+    private static VerifierSigningMaterial signingMaterial(Oid4vpConfig cfg) {
+        return VerifierSigningMaterial.resolve(cfg, java.util.stream.Stream::of);
     }
 
     private static String pem(byte[] der) {
