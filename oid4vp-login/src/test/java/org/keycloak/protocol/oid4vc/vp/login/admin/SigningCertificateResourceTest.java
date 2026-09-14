@@ -103,6 +103,29 @@ class SigningCertificateResourceTest {
     }
 
     /**
+     * Addressed by key rather than by provider, so a form can ask before anything is saved — and ask
+     * again the moment the choice changes, rather than describing what the last save happened to
+     * hold.
+     */
+    @Test
+    void itSummarisesAKeyAskedForByItself() throws Exception {
+        CertificateSummary summary = SigningCertificateResource
+            .summariseKey(COMPONENT_ID, SigningCertificateResourceTest::realmHoldingTheKey);
+
+        assertEquals(chain.issuerCert.getSubjectX500Principal().getName(), summary.subject());
+        assertEquals(VerifierClientId.x509Hash(chain.issuerCert), summary.clientId());
+    }
+
+    @Test
+    void aKeyAskedForByAnIdThatIsNotThereIsRefused() {
+        IllegalArgumentException refusal = assertThrows(IllegalArgumentException.class,
+            () -> SigningCertificateResource.summariseKey(
+                "deleted-component", SigningCertificateResourceTest::emptyRealm));
+
+        assertTrue(refusal.getMessage().contains("deleted-component"), refusal.getMessage());
+    }
+
+    /**
      * A dangling reference is not absence, and the difference is the whole value of this endpoint:
      * it must say so here rather than surface later as a wallet refusing the request for reasons
      * that name none of it.

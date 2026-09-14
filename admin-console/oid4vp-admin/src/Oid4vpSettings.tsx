@@ -193,22 +193,24 @@ export const Oid4vpSettings = ({ mode }: { mode: "add" | "edit" }) => {
   // What the chosen certificate actually says, computed by the server. The client_id below is the
   // one field on this page nobody can check by eye, and deriving it here instead would be a second
   // implementation of a value the request object already produces.
+  //
+  // Asked for BY KEY, not by provider. That is what lets this answer on the add page, where there is
+  // no provider yet, and what makes it follow the selector on the edit page rather than describing
+  // whatever the last save happened to hold.
   useFetch(
     async () => {
-      if (mode !== "edit" || !aliasParam || !keyRef) return undefined;
+      if (!keyRef) return "none" as const;
       // Plain fetch: this client exposes one resource object per stock endpoint and no generic
       // call, and adding a resource to it would mean patching the package.
       const response = await fetch(
-        `${adminClient.baseUrl}/admin/realms/${realm}`
-          + `/oid4vp/providers/${aliasParam}/signing-certificate`,
+        `${adminClient.baseUrl}/admin/realms/${realm}/oid4vp/keys/${keyRef}/certificate`,
         { headers: { Authorization: `Bearer ${await adminClient.getAccessToken()}` } },
       );
-      if (response.status === 404) return "none" as const;
       if (!response.ok) return "broken" as const;
       return (await response.json()) as CertificateSummary;
     },
     (summary) => setCertificate(summary),
-    [realm, mode, aliasParam, keyRef],
+    [realm, keyRef],
   );
 
   const issuing = useWatch({ control, name: ISSUANCE_SWITCH });
@@ -404,7 +406,7 @@ export const Oid4vpSettings = ({ mode }: { mode: "add" | "edit" }) => {
               />
             ))}
           {rows.some((property) => property.name === SIGNING_KEY_REF) && (
-            <CertificatePanel keys={keys} summary={certificate} mode={mode} />
+            <CertificatePanel keys={keys} summary={certificate} />
           )}
           {index === groups.length - 1 && buttons}
         </>,

@@ -86,6 +86,36 @@ public class SigningCertificateResource {
         }
     }
 
+    /**
+     * What a realm key's certificate says, asked for by the key itself.
+     *
+     * <p>This is what a settings form needs. Addressed by provider, a summary can only describe what
+     * the last save happened to hold — it cannot answer while a provider is being created, and on an
+     * existing one it describes the stored choice rather than the one on screen. Addressed by key,
+     * it answers the question the form is actually asking: what would this key announce.</p>
+     */
+    @GET
+    @Path("keys/{id}/certificate")
+    @Produces(MediaType.APPLICATION_JSON)
+    public CertificateSummary keyCertificate(@PathParam("id") String id) {
+        auth.realm().requireViewRealm();
+        try {
+            return summariseKey(id, realmKeys, clock);
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException(e.getMessage(), e);
+        }
+    }
+
+    static CertificateSummary summariseKey(String id, Supplier<Stream<KeyWrapper>> realmKeys) {
+        return summariseKey(id, realmKeys, Clock.systemUTC());
+    }
+
+    static CertificateSummary summariseKey(String id, Supplier<Stream<KeyWrapper>> realmKeys,
+                                           Clock clock) {
+        return CertificateSummary.of(
+            VerifierSigningMaterial.ofKey(id, realmKeys).certificate(), clock.instant());
+    }
+
     static Optional<CertificateSummary> summarise(Map<String, String> config,
                                                   Supplier<Stream<KeyWrapper>> realmKeys) {
         return summarise(config, realmKeys, Clock.systemUTC());
