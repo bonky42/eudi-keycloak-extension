@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.keycloak.oid4vp</groupId>
     <artifactId>keycloak-oid4vp-parent</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>oid4vp-login</artifactId>
 
@@ -15,9 +15,9 @@
   </properties>
 
   <dependencies>
-    <dependency><groupId>org.keycloak.oid4vp</groupId><artifactId>oid4vp-core</artifactId><version>0.1.0</version></dependency>
+    <dependency><groupId>org.keycloak.oid4vp</groupId><artifactId>oid4vp-core</artifactId><version>0.2.0-SNAPSHOT</version></dependency>
     <!-- réutilise le testsupport (SimulatedWallet, TestTrustChain, TestCredentialIssuer) de oid4vp-core -->
-    <dependency><groupId>org.keycloak.oid4vp</groupId><artifactId>oid4vp-core</artifactId><version>0.1.0</version><type>test-jar</type><scope>test</scope></dependency>
+    <dependency><groupId>org.keycloak.oid4vp</groupId><artifactId>oid4vp-core</artifactId><version>0.2.0-SNAPSHOT</version><type>test-jar</type><scope>test</scope></dependency>
 
     <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-core</artifactId></dependency>
     <dependency><groupId>org.keycloak</groupId><artifactId>keycloak-common</artifactId></dependency>

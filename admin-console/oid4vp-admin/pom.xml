@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.keycloak</groupId>
-    <version>0.1.0</version>
+    <version>0.2.0-SNAPSHOT</version>
     <artifactId>oid4vp-admin-ui</artifactId>
     <name>OID4VP Admin Console</name>
     <description>The Keycloak administration console, rebuilt with a page for the OID4VP identity provider.</description>
