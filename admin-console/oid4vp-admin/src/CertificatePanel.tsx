@@ -32,6 +32,9 @@ const MONOSPACE = { fontFamily: "var(--pf-v5-global--FontFamily--monospace)" };
 const READ_ONLY_BLOCK = {
   background: "var(--pf-v5-global--BackgroundColor--200)",
   border: "1px solid var(--pf-v5-global--BorderColor--100)",
+  // The rule down the left is the console's own mark for "this block, not the ones around it" —
+  // the same one the jump-to-section list puts beside the section you are in.
+  borderInlineStart: "3px solid var(--pf-v5-global--primary-color--100)",
   padding: "var(--pf-v5-global--spacer--md)",
 };
 
