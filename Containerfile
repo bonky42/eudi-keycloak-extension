@@ -16,19 +16,19 @@
 FROM quay.io/keycloak/keycloak:26.7.2 AS builder
 
 # Explicit paths, never a wildcard: `oid4vp-core-*.jar` would also carry
-# `oid4vp-core-0.1.0-SNAPSHOT-tests.jar`, which is the simulated wallet and its deliberate cheat
+# `oid4vp-core-0.1.0-tests.jar`, which is the simulated wallet and its deliberate cheat
 # modes, into a production image.
-COPY oid4vp-core/target/oid4vp-core-0.1.0-SNAPSHOT.jar   /opt/keycloak/providers/
-COPY oid4vp-login/target/oid4vp-login-0.1.0-SNAPSHOT.jar /opt/keycloak/providers/
+COPY oid4vp-core/target/oid4vp-core-0.1.0.jar   /opt/keycloak/providers/
+COPY oid4vp-login/target/oid4vp-login-0.1.0.jar /opt/keycloak/providers/
 # The rebuilt account console. It carries the `oid4vp` account theme and the front-end bundle, and
 # is produced by the command in docs/GETTING-STARTED.md — this image compiles the front end no more
 # than it compiles the Java.
-COPY account-console/oid4vp-account/target/oid4vp-account-ui-0.1.0-SNAPSHOT.jar /opt/keycloak/providers/
+COPY account-console/oid4vp-account/target/oid4vp-account-ui-0.1.0.jar /opt/keycloak/providers/
 # The rebuilt administration console, carrying the `oid4vp` admin theme and the OID4VP Wallet
 # settings page. It was written after this file and had no line here until 2026-09-14, so twenty-odd
 # versioned source files built a jar that no image ever carried — nothing failed, the console simply
 # was not there. A realm reaches it by setting adminTheme to `oid4vp`.
-COPY admin-console/oid4vp-admin/target/oid4vp-admin-ui-0.1.0-SNAPSHOT.jar /opt/keycloak/providers/
+COPY admin-console/oid4vp-admin/target/oid4vp-admin-ui-0.1.0.jar /opt/keycloak/providers/
 
 # The database vendor is a BUILD option, not a runtime one. Under `start --optimized`, anything not
 # baked here and supplied only at startup — an environment variable, a command-line argument — is
