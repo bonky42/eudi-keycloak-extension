@@ -98,7 +98,7 @@ uses the Utopia test PID. Nothing here has been through eIDAS conformance.
 | `scripts/prepare-demo` | Generates the demo PKI and renders that template. Needs only `openssl`. |
 | `tools` | The pinned build image for the account console. |
 | `Containerfile` | Assembles a runtime image carrying the three jars. Compiles nothing. |
-| `docs` | [`GETTING-STARTED.md`](docs/GETTING-STARTED.md) and [`TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md). |
+| `docs` | [`GETTING-STARTED.md`](docs/GETTING-STARTED.md), [`TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) and [`GLOSSARY.md`](docs/GLOSSARY.md). |
 
 ## Quick start
 
