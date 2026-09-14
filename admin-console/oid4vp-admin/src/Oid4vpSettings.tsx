@@ -404,7 +404,7 @@ export const Oid4vpSettings = ({ mode }: { mode: "add" | "edit" }) => {
               />
             ))}
           {rows.some((property) => property.name === SIGNING_KEY_REF) && (
-            <CertificatePanel keys={keys} summary={certificate} />
+            <CertificatePanel keys={keys} summary={certificate} mode={mode} />
           )}
           {index === groups.length - 1 && buttons}
         </>,

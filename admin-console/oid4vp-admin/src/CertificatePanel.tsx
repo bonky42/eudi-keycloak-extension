@@ -60,9 +60,12 @@ const day = (iso: string) => {
 export const CertificatePanel = ({
   keys,
   summary,
+  mode,
 }: {
   keys: ComponentRepresentation[];
   summary?: CertificateSummary | "none" | "broken";
+  /** The summary is read from a saved provider, so there is none to read while one is being made. */
+  mode: "add" | "edit";
 }) => {
   // No key in the realm at all is a different problem from no key chosen, and it has a different
   // answer: one is a choice not yet made, the other is a thing that has to be created first.
@@ -84,8 +87,11 @@ export const CertificatePanel = ({
   if (summary === undefined || summary === "none") {
     return (
       <div className="pf-v5-u-mt-md pf-v5-u-color-200" style={READ_ONLY_BLOCK}>
-        Choose a key above and this panel will say what its certificate is — who it names, who
-        signed it, how long it lasts, and the identifier wallets are told.
+        {mode === "add"
+          // Saying "choose a key and this panel will fill in" would be a promise this page cannot
+          // keep: the summary is read back from a saved provider, and there is not one yet.
+          ? "Once this provider is saved, this panel will say what the chosen key's certificate is — who it names, who signed it, how long it lasts, and the identifier wallets are told."
+          : "Choose a key above and this panel will say what its certificate is — who it names, who signed it, how long it lasts, and the identifier wallets are told."}
       </div>
     );
   }
