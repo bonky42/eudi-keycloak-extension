@@ -24,6 +24,17 @@ export type CertificateSummary = {
 
 const MONOSPACE = { fontFamily: "var(--pf-v5-global--FontFamily--monospace)" };
 
+/**
+ * Read, not edited. Set off on its own ground because everything above it is a field an
+ * administrator fills in and this is the server answering back — laid flat among the inputs it read
+ * as one more of them.
+ */
+const READ_ONLY_BLOCK = {
+  background: "var(--pf-v5-global--BackgroundColor--200)",
+  border: "1px solid var(--pf-v5-global--BorderColor--100)",
+  padding: "var(--pf-v5-global--spacer--md)",
+};
+
 const day = (iso: string) => {
   const parsed = new Date(iso);
   return Number.isNaN(parsed.getTime())
@@ -69,10 +80,10 @@ export const CertificatePanel = ({
 
   if (summary === undefined || summary === "none") {
     return (
-      <p className="pf-v5-u-mt-md pf-v5-u-color-200">
+      <div className="pf-v5-u-mt-md pf-v5-u-color-200" style={READ_ONLY_BLOCK}>
         Choose a key above and this panel will say what its certificate is — who it names, who
         signed it, how long it lasts, and the identifier wallets are told.
-      </p>
+      </div>
     );
   }
 
@@ -97,7 +108,16 @@ export const CertificatePanel = ({
       : { color: "green" as const, text: `In force until ${day(summary.notAfter)}` };
 
   return (
-    <div className="pf-v5-u-mt-md">
+    <div className="pf-v5-u-mt-md" style={READ_ONLY_BLOCK}>
+      <div
+        className="pf-v5-u-mb-md"
+        style={{
+          fontWeight: "var(--pf-v5-global--FontWeight--bold)",
+          color: "var(--pf-v5-global--Color--200)",
+        }}
+      >
+        What this key&apos;s certificate says
+      </div>
       <DescriptionList isHorizontal termWidth="14rem">
         <DescriptionListGroup>
           <DescriptionListTerm>Announced to wallets</DescriptionListTerm>
