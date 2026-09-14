@@ -2,22 +2,16 @@ package org.keycloak.protocol.oid4vc.vp.login.admin;
 
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import org.keycloak.crypto.KeyWrapper;
-import org.keycloak.models.IdentityProviderModel;
-import org.keycloak.models.RealmModel;
 import org.keycloak.protocol.oid4vc.vp.login.keys.VerifierSigningMaterial;
-import org.keycloak.protocol.oid4vc.vp.login.protocol.Oid4vpConfig;
 import org.keycloak.protocol.oid4vc.vp.request.CertificateSummary;
 import org.keycloak.services.resources.admin.fgap.AdminPermissionEvaluator;
 
 import java.time.Clock;
-import java.util.Map;
-import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -33,10 +27,14 @@ import java.util.stream.Stream;
  * <p>The rest — subject, issuer, validity, curve — is in the PEM for anyone willing to run
  * {@code openssl x509 -text}. Not having to is the point.
  *
- * <p><b>Read-only, deliberately.</b> It reads configuration and computes; it writes nothing, so it
- * raises no admin event and needs no event builder. Reached under
- * {@code /admin/realms/{realm}/oid4vp/...}, so Keycloak's own admin authentication applies before
- * anything here runs, and {@link AdminPermissionEvaluator} is asked for realm view rights on top.
+ * <p><b>Read-only, deliberately.</b> It reads a key and computes; it writes nothing, so it raises no
+ * admin event and needs no event builder. Reached under {@code /admin/realms/{realm}/oid4vp/...},
+ * so Keycloak's own admin authentication applies before anything here runs, and
+ * {@link AdminPermissionEvaluator} is asked for realm view rights on top. Measured against 26.7.2:
+ * no token and a bad token answer 401; a user with no admin role answers 403, and so does one
+ * holding {@code view-users} but not {@code view-realm}; an administrator of another realm answers
+ * 403. The lookup is bounded by the realm in the path, so a key of one realm cannot be read through
+ * another.
  *
  * <p><b>The HTTP mapping lives in the resource method and nowhere else.</b> {@link #summarise} is a
  * plain function over a configuration map — building a JAX-RS exception needs a {@code
@@ -45,45 +43,15 @@ import java.util.stream.Stream;
  */
 public class SigningCertificateResource {
 
-    private final RealmModel realm;
     private final AdminPermissionEvaluator auth;
     private final Supplier<Stream<KeyWrapper>> realmKeys;
     private final Clock clock;
 
-    SigningCertificateResource(RealmModel realm, AdminPermissionEvaluator auth,
+    SigningCertificateResource(AdminPermissionEvaluator auth,
                                Supplier<Stream<KeyWrapper>> realmKeys, Clock clock) {
-        this.realm = realm;
         this.auth = auth;
         this.realmKeys = realmKeys;
         this.clock = clock;
-    }
-
-    /**
-     * @param alias the identity provider's alias, as it appears in the realm
-     * @return what its configured signing certificate says about itself
-     */
-    @GET
-    @Path("providers/{alias}/signing-certificate")
-    @Produces(MediaType.APPLICATION_JSON)
-    public CertificateSummary signingCertificate(@PathParam("alias") String alias) {
-        auth.realm().requireViewRealm();
-
-        IdentityProviderModel provider = realm.getIdentityProvidersStream()
-            .filter(candidate -> candidate.getAlias().equals(alias))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("No identity provider with alias " + alias));
-
-        try {
-            return summarise(provider.getConfig(), realmKeys, clock)
-                .orElseThrow(() -> new NotFoundException(
-                    "This provider names no signing key yet"));
-        } catch (IllegalArgumentException e) {
-            // A reference that names a key which is gone, or a key that cannot sign for this
-            // provider. That is a mistake already made, not a field left empty: saying so here is
-            // what keeps it from surfacing later as a wallet refusing the request for reasons that
-            // name none of it.
-            throw new BadRequestException(e.getMessage(), e);
-        }
     }
 
     /**
@@ -114,28 +82,5 @@ public class SigningCertificateResource {
                                            Clock clock) {
         return CertificateSummary.of(
             VerifierSigningMaterial.ofKey(id, realmKeys).certificate(), clock.instant());
-    }
-
-    static Optional<CertificateSummary> summarise(Map<String, String> config,
-                                                  Supplier<Stream<KeyWrapper>> realmKeys) {
-        return summarise(config, realmKeys, Clock.systemUTC());
-    }
-
-    /**
-     * The certificate comes through the same resolver the request object uses, so this cannot
-     * describe one certificate while the wallet is shown another.
-     *
-     * @return empty when the provider names no key — a form being filled in, not a fault
-     * @throws IllegalArgumentException when it names one that cannot sign for it
-     */
-    static Optional<CertificateSummary> summarise(Map<String, String> config,
-                                                  Supplier<Stream<KeyWrapper>> realmKeys,
-                                                  Clock clock) {
-        Oid4vpConfig typed = new Oid4vpConfig(config == null ? Map.of() : config);
-        if (typed.signingKeyRef() == null) {
-            return Optional.empty();
-        }
-        return Optional.of(CertificateSummary.of(
-            VerifierSigningMaterial.resolve(typed, realmKeys).certificate(), clock.instant()));
     }
 }
