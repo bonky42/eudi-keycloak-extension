@@ -31,8 +31,10 @@ public class Oid4vpAdminResourceProviderFactory implements AdminRealmResourcePro
             @Override
             public Object getResource(KeycloakSession session, RealmModel realm,
                                       AdminPermissionEvaluator auth, AdminEventBuilder events) {
+                // The realm is not passed on: it is already what bounds the key lookup below, and
+                // a resource holding it too could drift from the one the keys came from.
                 return new SigningCertificateResource(
-                    realm, auth, () -> session.keys().getKeysStream(realm), Clock.systemUTC());
+                    auth, () -> session.keys().getKeysStream(realm), Clock.systemUTC());
             }
 
             @Override

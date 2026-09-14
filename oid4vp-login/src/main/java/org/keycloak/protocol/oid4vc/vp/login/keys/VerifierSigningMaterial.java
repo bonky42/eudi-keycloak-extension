@@ -55,6 +55,14 @@ public record VerifierSigningMaterial(KeyPair keyPair, X509Certificate certifica
         return fromRealmKey(ref, realmKeys.get());
     }
 
+    /**
+     * The same lookup, asked for by key rather than reached through a provider — so a form can ask
+     * about a key it has not saved onto anything yet.
+     */
+    public static VerifierSigningMaterial ofKey(String ref, Supplier<Stream<KeyWrapper>> realmKeys) {
+        return fromRealmKey(ref, realmKeys.get());
+    }
+
     private static VerifierSigningMaterial fromRealmKey(String ref, Stream<KeyWrapper> realmKeys) {
         KeyWrapper key = realmKeys
             .filter(candidate -> ref.equals(candidate.getProviderId()))
